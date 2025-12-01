@@ -1,0 +1,83 @@
+import React from 'react';
+import {View, Text, StyleSheet, Dimensions} from 'react-native';
+import {Colors} from '../constants/Colors';
+import PageTemplate from './PageTemplate';
+
+interface DeleteAccountPageProps {
+  currentScreen: string;
+  onNavigate: (screen: string) => void;
+  onBack?: () => void;
+}
+
+const SCREEN_WIDTH = Dimensions.get('window').width || 375;
+const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
+
+const DeleteAccountPage: React.FC<DeleteAccountPageProps> = ({
+  currentScreen,
+  onNavigate,
+  onBack,
+}) => {
+  return (
+    <PageTemplate
+      title="Delete your account"
+      currentScreen={currentScreen}
+      onNavigate={onNavigate}
+      onBack={onBack}>
+      <View style={styles.content}>
+        {[1, 2, 3].map(row => (
+          <View key={row} style={styles.row}>
+            {[1, 2].map(col => (
+              <View
+                key={col}
+                style={[
+                  styles.squareCard,
+                  {
+                    backgroundColor:
+                      (row + col) % 2 === 0
+                        ? Colors.primary
+                        : Colors.secondary,
+                    marginRight: col === 1 ? 8 : 0,
+                    marginLeft: col === 2 ? 8 : 0,
+                  },
+                ]}>
+                <Text style={styles.cardText}>
+                  Item {row * 2 - 1 + col - 1}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </PageTemplate>
+  );
+};
+
+const styles = StyleSheet.create({
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  squareCard: {
+    width: CARD_WIDTH,
+    aspectRatio: 1,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
+    textAlign: 'center',
+  },
+});
+
+export default DeleteAccountPage;
+
+

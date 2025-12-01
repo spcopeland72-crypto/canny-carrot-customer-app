@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Canny Carrot",
+    "slug": "canny-carrot-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cannycarrot.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs camera access to scan QR codes for rewards and promotions.",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+      }
+    },
+    "android": {
+      "package": "com.cannycarrot.app",
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {},
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Canny Carrot to access your camera to scan QR codes for rewards."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "50b74f9a-d258-4fda-a9fe-d73f5bd2db05"
+      }
+    }
+  }
+}

@@ -1,0 +1,1364 @@
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  StatusBar,
+  SafeAreaView,
+  Image,
+  Linking,
+} from 'react-native';
+import {Colors} from '../constants/Colors';
+import {getTimeBasedGreeting} from '../utils/timeGreeting';
+import CircularProgress from './CircularProgress';
+import BottomNavigation from './BottomNavigation';
+import FindMoreRewardsModal from './FindMoreRewardsModal';
+import ScanModal from './ScanModal';
+import HelpModal from './HelpModal';
+import NotificationsModal from './NotificationsModal';
+
+// Import images at module level
+// Path from src/components/ to assets/ is ../../assets/
+let logoImage;
+let bannerImage;
+
+try {
+  logoImage = require('../../assets/logo.png');
+  console.log('Logo loaded from assets');
+} catch (e) {
+  console.log('Logo not found in assets:', e);
+  try {
+    logoImage = require('../../Images/NEW Logo With Outline.png');
+    console.log('Logo loaded from Images folder');
+  } catch (e2) {
+    console.log('Logo not found anywhere:', e2);
+  }
+}
+
+try {
+  bannerImage = require('../../assets/banner.png');
+  console.log('Banner loaded from assets');
+} catch (e) {
+  console.log('Banner not found in assets:', e);
+  try {
+    bannerImage = require('../../Images/Banner 1.png');
+    console.log('Banner loaded from Images folder');
+  } catch (e2) {
+    console.log('Banner not found anywhere:', e2);
+  }
+}
+
+// Load Blackwells logo using same pattern as banner/logo
+let blackwellsLogo;
+try {
+  blackwellsLogo = require('../../assets/blackwells.png');
+} catch (e) {
+  try {
+    blackwellsLogo = require('../../Images/blackwells.png');
+  } catch (e2) {
+    // Logo not found - will use emoji fallback
+    blackwellsLogo = null;
+  }
+}
+
+// Load Bluecorn Bakery logo for circle 2
+let bluecornLogo;
+try {
+  bluecornLogo = require('../../assets/bluecorn-bakers.png');
+} catch (e) {
+  try {
+    bluecornLogo = require('../../Images/bluecorn-bakers.png');
+  } catch (e2) {
+    // Logo not found - will use emoji fallback
+    bluecornLogo = null;
+  }
+}
+
+// Load logo for circle 3 (Sandwiches & Salads) - The Green Florist
+let sandwichLogo;
+try {
+  sandwichLogo = require('../../assets/green-florist.png');
+} catch (e) {
+  try {
+    sandwichLogo = require('../../Images/green-florist.png');
+  } catch (e2) {
+    // Logo not found - will use emoji fallback
+    sandwichLogo = null;
+  }
+}
+
+// Note: online-black.png will be loaded in component to prevent module-level crashes
+
+// Load Google Maps image for More Goodies section from Images folder
+let googleMapsImage;
+try {
+  // Try google-maps.png from Images folder first
+  googleMapsImage = require('../../Images/google-maps.png');
+} catch (e) {
+  try {
+    // Try Screenshot_20251125-214945.jpg (full Google Maps with dog grooming businesses)
+    googleMapsImage = require('../../Images/Screenshot_20251125-214945.jpg');
+  } catch (e2) {
+    try {
+      // Try Screenshot_20251125-214955.jpg as fallback
+      googleMapsImage = require('../../Images/Screenshot_20251125-214955.jpg');
+    } catch (e3) {
+      try {
+        // Try assets folder as fallback
+        googleMapsImage = require('../../assets/google-maps.jpg');
+      } catch (e4) {
+        try {
+          googleMapsImage = require('../../Images/screen.png');
+        } catch (e5) {
+          // Image not found - will use placeholder
+          googleMapsImage = null;
+        }
+      }
+    }
+  }
+}
+
+// Load Featured Campaigns image for More Goodies section card 2
+let featuredCampaignsImage;
+try {
+  featuredCampaignsImage = require('../../Images/featured campaigns.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  featuredCampaignsImage = null;
+}
+
+// Load Shop Online image for Features section card 1
+let shopOnlineImage;
+try {
+  shopOnlineImage = require('../../Images/shop-online.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  shopOnlineImage = null;
+}
+
+// Load calvin.png image for Features section card 2
+let calvinImage;
+try {
+  calvinImage = require('../../Images/calvin.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  calvinImage = null;
+}
+
+// Load review.png image for Features section card 3
+let reviewImage;
+try {
+  reviewImage = require('../../Images/review.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  reviewImage = null;
+}
+
+// Load earn.png image for Features section card 4
+let earnImage;
+try {
+  earnImage = require('../../Images/earn.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  earnImage = null;
+}
+
+// Load competition.png image for CTA section
+let competitionImage;
+try {
+  competitionImage = require('../../Images/competition.png');
+} catch (e) {
+  // Image not found - will use placeholder
+  competitionImage = null;
+}
+
+// Load daisy-chain.png image for Rewards section circle 4
+// Temporarily disabled to prevent blank screen
+let daisyChainImage = null;
+/*
+try {
+  daisyChainImage = require('../../assets/daisy-chain.png');
+} catch (e) {
+  try {
+    daisyChainImage = require('../../Images/daisy-chain.png');
+  } catch (e2) {
+    // Image not found - will use emoji fallback
+    daisyChainImage = null;
+  }
+}
+*/
+
+// Load rotating images for Featured Gold Members card (More Goodies card 3)
+const goldMemberImages = [
+  require('../../Images/blackwells.png'),
+  require('../../Images/bluecorn-bakers.png'),
+  require('../../Images/daisy-chain.png'),
+  require('../../Images/cosmetics.png'),
+  require('../../Images/green-florist.png'),
+];
+
+// Load campaigns image for card 4
+let campaignsImage;
+try {
+  campaignsImage = require('../../Images/campaigns.png');
+} catch (e) {
+  campaignsImage = null;
+}
+
+// Load social media icons from Images folder - using static imports for Metro bundler
+const facebookIcon = require('../../Images/facebook.png');
+const instagramIcon = require('../../Images/instagram.png');
+const tiktokIcon = require('../../Images/tiktok.png');
+const xIcon = require('../../Images/x.png');
+const linkedinIcon = require('../../Images/linkedin.png');
+
+// Load online-black.png for circle 3
+const onlineBlackIcon = require('../../Images/online-black.png');
+
+const getScreenWidth = () => {
+  try {
+    return Dimensions.get('window').width || 375; // Default to iPhone width
+  } catch {
+    return 375;
+  }
+};
+
+const SCREEN_WIDTH = getScreenWidth();
+const CARD_WIDTH = SCREEN_WIDTH * 0.25;
+const RECTANGULAR_CARD_WIDTH = SCREEN_WIDTH * 0.7;
+
+interface RewardCard {
+  id: string;
+  title: string;
+  count: number;
+  total: number; // Total needed to complete
+  icon: string; // Icon name or emoji for now
+  image?: any; // Optional image source for logo/image
+}
+
+interface GoodieCard {
+  id: string;
+  title: string;
+  image: string; // Placeholder for image
+}
+
+interface FeatureCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+}
+
+interface HomeScreenProps {
+  currentScreen?: string;
+  onNavigate?: (screen: string) => void;
+  onScanPress?: () => void;
+}
+
+const HomeScreen: React.FC<HomeScreenProps> = ({
+  currentScreen = 'Home',
+  onNavigate = () => {},
+  onScanPress = () => {},
+}) => {
+  const [userName] = useState('Simon'); // This would come from user context
+  const [logoError, setLogoError] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
+  const [findMoreRewardsModalVisible, setFindMoreRewardsModalVisible] =
+    useState(false);
+  const [scanModalVisible, setScanModalVisible] = useState(false);
+  const [helpModalVisible, setHelpModalVisible] = useState(false);
+  const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+  const [hasUnreadNotifications] = useState(true); // This would come from user context/API
+  const [onlineImageError, setOnlineImageError] = useState(false);
+  const [onlineBlackImage, setOnlineBlackImage] = useState<any>(null);
+  const [socialIcons, setSocialIcons] = useState<{
+    facebook?: any;
+    instagram?: any;
+    tiktok?: any;
+    x?: any;
+    linkedin?: any;
+  }>({});
+  const [currentGoldMemberImageIndex, setCurrentGoldMemberImageIndex] = useState(0);
+  const greeting = getTimeBasedGreeting();
+
+  // Set online-black.png from module-level variable
+  useEffect(() => {
+    setOnlineBlackImage(onlineBlackIcon);
+  }, []);
+
+  // Rotate Featured Gold Members images every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentGoldMemberImageIndex((prevIndex) => 
+        (prevIndex + 1) % goldMemberImages.length
+      );
+    }, 3000); // Change image every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Set social media icons from module-level variables
+  useEffect(() => {
+    setSocialIcons({
+      facebook: facebookIcon,
+      instagram: instagramIcon,
+      tiktok: tiktokIcon,
+      x: xIcon,
+      linkedin: linkedinIcon,
+    });
+  }, []);
+
+  // Sample data - replace with actual data
+  const rewardCards: RewardCard[] = [
+    {id: '1', title: 'Blackwells Butchers', count: 8, total: 10, icon: '🥐', image: blackwellsLogo},
+    {id: '2', title: 'Bluecorn Bakers', count: 7, total: 10, icon: '☕', image: bluecornLogo},
+    {id: '3', title: 'The Green Florist', count: 9, total: 10, icon: '🥪', image: sandwichLogo},
+    {id: '4', title: 'Sweet Treats', count: 9, total: 10, icon: '🍩', image: daisyChainImage},
+    {id: '5', title: 'Hot Meals', count: 6, total: 10, icon: '🍲'},
+    {id: '6', title: 'Breakfast', count: 5, total: 10, icon: '🥞'},
+  ];
+
+  const goodieCards: GoodieCard[] = [
+    {id: '1', title: 'Find More Rewards', image: ''},
+    {id: '2', title: 'Featured Campaigns', image: ''},
+    {id: '3', title: 'Featured Gold Members', image: ''},
+    {id: '4', title: 'NEW Campaigns!', image: ''},
+  ];
+
+  const featureCards: FeatureCard[] = [
+    {
+      id: '1',
+      title: 'Rewards When You Shop Online',
+      subtitle: 'Get started',
+      icon: '🛍️',
+    },
+    {
+      id: '2',
+      title: 'Join in the\nCanny Chat',
+      subtitle: 'Take a look',
+      icon: '📋',
+    },
+    {
+      id: '3',
+      title: 'Write a Review for More Rewards',
+      subtitle: 'Nearest shop',
+      icon: '📍',
+    },
+    {
+      id: '4',
+      title: 'Refer and Earn',
+      subtitle: 'Treat someone',
+      icon: '🎁',
+    },
+  ];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      
+      {/* Top Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            {logoImage && !logoError ? (
+              <Image
+                source={logoImage}
+                style={styles.logo}
+                resizeMode="contain"
+                onError={() => {
+                  console.log('Logo image failed to load');
+                  setLogoError(true);
+                }}
+              />
+            ) : (
+              <Text style={styles.logoText}>CC</Text>
+            )}
+          </View>
+          
+          {/* Time-based greeting */}
+          <Text style={styles.greeting}>
+            {greeting}, {userName}
+          </Text>
+          
+          {/* Right icons */}
+          <View style={styles.headerIcons}>
+            <TouchableOpacity
+              style={[styles.iconButton, {marginRight: 12}]}
+              onPress={() => setHelpModalVisible(true)}>
+              <View style={styles.iconCircle}>
+                <Text style={styles.iconText}>?</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setNotificationsModalVisible(true)}>
+              <View style={styles.bellIconContainer}>
+                {/* Bell handle/loop at top */}
+                <View style={styles.bellHandle} />
+                {/* Bell body - rounded shape, wider at bottom */}
+                <View style={styles.bellBody}>
+                  {/* Bottom horizontal band */}
+                  <View style={styles.bellBottomBand} />
+                </View>
+                {/* Clapper/opening at very bottom */}
+                <View style={styles.bellClapper} />
+                {/* Red dot indicator for unread notifications */}
+                {hasUnreadNotifications && (
+                  <View style={styles.notificationDot} />
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        
+        {/* Marketing Banner Section */}
+        <View style={styles.bannerSection}>
+          {bannerImage && !bannerError ? (
+            <Image
+              source={bannerImage}
+              style={styles.bannerImage}
+              resizeMode="cover"
+              onError={() => {
+                console.log('Banner image failed to load');
+                setBannerError(true);
+              }}
+            />
+          ) : (
+            <View style={styles.banner}>
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitle}>Canny Carrot</Text>
+                  <Text style={styles.bannerSubtitle}>Rewards</Text>
+                  {/* Social Media Icons */}
+                  <View style={styles.socialIconsContainer}>
+                    {socialIcons.facebook && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                        <Image
+                          source={socialIcons.facebook}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.instagram && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                        <Image
+                          source={socialIcons.instagram}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.tiktok && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                        <Image
+                          source={socialIcons.tiktok}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.x && (
+                      <TouchableOpacity
+                        style={[styles.socialIcon, {marginRight: 7}]}
+                        onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                        <Image
+                          source={socialIcons.x}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.linkedin && (
+                      <TouchableOpacity
+                        style={styles.socialIcon}
+                        onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                        <Image
+                          source={socialIcons.linkedin}
+                          style={styles.socialIconImage}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.bannerLogoContainer}>
+                  <View style={styles.bannerLogoPlaceholder}>
+                    <Text style={styles.bannerLogoText}>Logo</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+          {/* Social Media Icons for banner with image */}
+          {bannerImage && !bannerError && (
+            <View style={styles.bannerSocialIconsOverlay}>
+              <View style={styles.socialIconsContainer}>
+                {socialIcons.facebook && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                    <Image
+                      source={socialIcons.facebook}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.instagram && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                    <Image
+                      source={socialIcons.instagram}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.tiktok && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                    <Image
+                      source={socialIcons.tiktok}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.x && (
+                  <TouchableOpacity
+                    style={[styles.socialIcon, {marginRight: 7}]}
+                    onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                    <Image
+                      source={socialIcons.x}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {socialIcons.linkedin && (
+                  <TouchableOpacity
+                    style={styles.socialIcon}
+                    onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                    <Image
+                      source={socialIcons.linkedin}
+                      style={styles.socialIconImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Rewards Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>REWARDS</Text>
+            <TouchableOpacity onPress={() => onNavigate('LearnMore')}>
+              <Text style={styles.sectionLink}>Learn more</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}>
+            {rewardCards.map((card) => {
+              const progress = ((card.total - card.count) / card.total) * 100;
+              // All circles use orange
+              const progressColor = Colors.secondary;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  style={styles.rewardCard}
+                  onPress={() => onNavigate(`Reward${card.id}`)}>
+                  <View style={styles.rewardTitleContainer}>
+                    <Text style={styles.rewardTitle}>{card.title}</Text>
+                  </View>
+                  <View style={styles.rewardProgressContainer}>
+                    {/* Online-black.png image at top left corner of circle 3 */}
+                    {card.id === '3' && onlineBlackImage && !onlineImageError ? (
+                      <View style={styles.onlineImageContainer}>
+                        <Image
+                          source={onlineBlackImage}
+                          style={styles.onlineImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.log('Online-black image failed to load');
+                            setOnlineImageError(true);
+                          }}
+                        />
+                      </View>
+                    ) : null}
+                    <CircularProgress
+                      key={`progress-${card.id}`}
+                      size={80}
+                      strokeWidth={6}
+                      progress={progress}
+                      color={progressColor}
+                      backgroundColor={Colors.neutral[200]}
+                    />
+                    <View style={[
+                      styles.rewardIconOverlay,
+                      card.id === '2' && styles.rewardIconOverlayBlue,
+                      card.id === '3' && styles.rewardIconOverlayGreen
+                    ]}>
+                      {card.id === '1' && blackwellsLogo ? (
+                        <Image
+                          source={blackwellsLogo}
+                          style={styles.rewardImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.log('Blackwells logo failed to load, using emoji');
+                          }}
+                        />
+                      ) : card.id === '2' && bluecornLogo ? (
+                        <Image
+                          source={bluecornLogo}
+                          style={styles.rewardImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.log('Bluecorn logo failed to load, using emoji');
+                          }}
+                        />
+                      ) : card.id === '3' && sandwichLogo ? (
+                        <Image
+                          source={sandwichLogo}
+                          style={styles.rewardImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.log('Sandwich logo failed to load, using emoji');
+                          }}
+                        />
+                      ) : card.id === '4' && daisyChainImage ? (
+                        <Image
+                          source={daisyChainImage}
+                          style={styles.rewardImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.log('Daisy chain image failed to load, using emoji');
+                          }}
+                        />
+                      ) : (
+                        <Text style={styles.rewardIcon}>{card.icon}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.rewardCount}>Collect {card.count} more</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* More Goodies Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>More Goodies</Text>
+            <TouchableOpacity onPress={() => onNavigate('SeeAllGoodies')}>
+              <Text style={styles.sectionLink}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}>
+            {goodieCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.goodieCard}
+                onPress={() => {
+                  if (card.id === '1') {
+                    setFindMoreRewardsModalVisible(true);
+                  } else if (card.id === '2') {
+                    onNavigate('FeaturedCampaigns');
+                  } else if (card.id === '3') {
+                    onNavigate('Goodie3');
+                  } else if (card.id === '4') {
+                    onNavigate('Goodie4');
+                  }
+                }}>
+                {card.id === '1' && googleMapsImage ? (
+                  <Image
+                    source={googleMapsImage}
+                    style={styles.goodieImage}
+                    resizeMode="cover"
+                    onError={() => {
+                      console.log('Google Maps image failed to load');
+                    }}
+                  />
+                ) : card.id === '2' && featuredCampaignsImage ? (
+                  <Image
+                    source={featuredCampaignsImage}
+                    style={styles.goodieImage}
+                    resizeMode="cover"
+                    onError={() => {
+                      console.log('Featured Campaigns image failed to load');
+                    }}
+                  />
+                ) : card.id === '3' ? (
+                  <View style={styles.rotatingImageContainer}>
+                    {goldMemberImages.map((image, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.rotatingImage,
+                          {
+                            opacity: currentGoldMemberImageIndex === index ? 1 : 0,
+                            transition: 'opacity 0.8s ease-in-out',
+                          },
+                        ]}>
+                        <Image
+                          source={image}
+                          style={styles.goodieImage}
+                          resizeMode="cover"
+                          onError={() => {
+                            console.log(`Gold member image ${index} failed to load`);
+                          }}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : card.id === '4' && campaignsImage ? (
+                  <Image
+                    source={campaignsImage}
+                    style={styles.goodieImage}
+                    resizeMode="cover"
+                    onError={() => {
+                      console.log('Campaigns image failed to load');
+                    }}
+                  />
+                ) : (
+                  <View style={styles.goodieImagePlaceholder}>
+                    <Text style={styles.placeholderText}>Image</Text>
+                  </View>
+                )}
+                {card.id === '4' ? (
+                  <View style={styles.goodieTitle}>
+                    <Text style={styles.newText}>NEW </Text>
+                    <Text style={styles.goodieTitleText}>Campaigns!</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.goodieTitle}>{card.title}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Features Section - 2x2 Grid */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Features</Text>
+          <View style={styles.featuresGrid}>
+            {featureCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.featureCard}
+                onPress={() => {
+                  if (card.id === '1') {
+                    onNavigate('ShopOnline');
+                  } else if (card.id === '2') {
+                    onNavigate('Chat');
+                  } else if (card.id === '3') {
+                    onNavigate('WriteReview');
+                  } else if (card.id === '4') {
+                    onNavigate('ReferEarn');
+                  }
+                }}>
+                <View style={styles.featureCardTopBorder} />
+                <View style={styles.featureCardContent}>
+                  <View style={styles.featureCardTop}>
+                    {card.id === '1' && shopOnlineImage ? (
+                      <Image
+                        source={shopOnlineImage}
+                        style={styles.featureImage}
+                        resizeMode="contain"
+                        onError={() => {
+                          console.log('Shop Online image failed to load');
+                        }}
+                      />
+                    ) : card.id === '2' && calvinImage ? (
+                      <Image
+                        source={calvinImage}
+                        style={styles.featureImage}
+                        resizeMode="contain"
+                        onError={() => {
+                          console.log('Calvin image failed to load');
+                        }}
+                      />
+                    ) : card.id === '3' && reviewImage ? (
+                      <Image
+                        source={reviewImage}
+                        style={styles.featureImage}
+                        resizeMode="contain"
+                        onError={() => {
+                          console.log('Review image failed to load');
+                        }}
+                      />
+                    ) : card.id === '4' && earnImage ? (
+                      <Image
+                        source={earnImage}
+                        style={styles.featureImage}
+                        resizeMode="contain"
+                        onError={() => {
+                          console.log('Earn image failed to load');
+                        }}
+                      />
+                    ) : (
+                      <View style={styles.featureIconContainer}>
+                        <Text style={styles.featureIcon}>{card.icon}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.featureCardBottom}>
+                    <Text style={styles.featureTitle}>{card.title}</Text>
+                    <View style={styles.featureNavButton}>
+                      <Text style={styles.featureNavButtonText}>{card.subtitle}</Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* CTA Section */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.ctaButton}
+            onPress={() => onNavigate('Competition')}>
+            {competitionImage ? (
+              <Image
+                source={competitionImage}
+                style={styles.ctaImage}
+                resizeMode="cover"
+                onError={() => {
+                  console.log('Competition image failed to load');
+                }}
+              />
+            ) : null}
+            <View style={styles.ctaTextContainer}>
+              <Text style={styles.ctaCompetitionText}>
+                enter our Christmas{'\n'}competition
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Bottom Navigation */}
+      <BottomNavigation
+        currentScreen={currentScreen}
+        onNavigate={onNavigate}
+        onScanPress={() => setScanModalVisible(true)}
+      />
+
+      {/* Modals */}
+      <FindMoreRewardsModal
+        visible={findMoreRewardsModalVisible}
+        onClose={() => setFindMoreRewardsModalVisible(false)}
+      />
+      <ScanModal
+        visible={scanModalVisible}
+        onClose={() => setScanModalVisible(false)}
+      />
+      <HelpModal
+        visible={helpModalVisible}
+        onClose={() => setHelpModalVisible(false)}
+      />
+      <NotificationsModal
+        visible={notificationsModalVisible}
+        onClose={() => setNotificationsModalVisible(false)}
+        hasUnread={hasUnreadNotifications}
+      />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logo: {
+    width: 50,
+    height: 50,
+  },
+  logoContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.background,
+  },
+  greeting: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+  },
+  iconButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  bellIconContainer: {
+    width: 28,
+    height: 28,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 2,
+  },
+  bellHandle: {
+    width: 8,
+    height: 5,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: Colors.primary,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    marginBottom: -1,
+  },
+  bellBody: {
+    width: 20,
+    height: 16,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderRadius: 10,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    borderBottomWidth: 0,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'visible',
+  },
+  bellBottomBand: {
+    position: 'absolute',
+    bottom: -2,
+    width: 24,
+    height: 3,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderRadius: 2,
+    backgroundColor: Colors.background,
+  },
+  bellClapper: {
+    width: 6,
+    height: 4,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: Colors.primary,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    marginTop: -1,
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF0000',
+    borderWidth: 1.5,
+    borderColor: Colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  bannerSection: {
+    marginBottom: 24,
+    width: '100%',
+    position: 'relative',
+  },
+  bannerImage: {
+    width: '100%',
+    height: 171, // Reduced by 5% from 180
+  },
+  banner: {
+    backgroundColor: Colors.secondary, // Orange background
+    paddingHorizontal: 20,
+    paddingVertical: 17, // Reduced by 5% from 18
+    minHeight: 128, // Reduced by 5% from 135
+    justifyContent: 'center',
+    width: '100%',
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  bannerTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  bannerTitle: {
+    fontSize: 28, // Reduced by 5% from 29
+    fontWeight: 'bold',
+    color: Colors.background,
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 21, // Reduced by 5% from 22
+    fontWeight: '600',
+    color: Colors.background,
+    marginBottom: 8,
+  },
+  socialIconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  socialIcon: {
+    width: 27,
+    height: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialIconImage: {
+    width: 27,
+    height: 27,
+    // No tintColor - display images in their original colors
+  },
+  bannerSocialIconsOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  bannerLogoContainer: {
+    width: 103, // Reduced by 5% from 108
+    height: 103, // Reduced by 5% from 108
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerLogoPlaceholder: {
+    width: 103, // Reduced by 5% from 108
+    height: 103, // Reduced by 5% from 108
+    borderRadius: 51, // Reduced by 5% from 54
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: Colors.neutral[300],
+  },
+  bannerLogoText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+  },
+  section: {
+    marginBottom: 32,
+    paddingHorizontal: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  sectionLink: {
+    fontSize: 16,
+    color: Colors.background,
+    fontWeight: 'bold',
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  carouselContent: {
+    paddingRight: 16,
+  },
+  rewardCard: {
+    width: CARD_WIDTH,
+    alignItems: 'center',
+    marginRight: 12,
+    // Make it touchable
+  },
+  rewardTitleContainer: {
+    height: 48, // Fixed height container to align all circles
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  rewardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    textAlign: 'center',
+  },
+  rewardProgressContainer: {
+    position: 'relative',
+    marginBottom: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  onlineImageContainer: {
+    position: 'absolute',
+    top: -5, // Position at top left corner of the circle (slightly offset for visibility)
+    left: -5,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    zIndex: 5,
+  },
+  onlineImage: {
+    width: 40,
+    height: 40,
+  },
+  rewardIconOverlay: {
+    position: 'absolute',
+    width: 68, // Smaller than 80 to show the progress ring around it
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rewardIconOverlayBlue: {
+    backgroundColor: '#87CEEB', // Sky blue to match Bluecorn Bakery logo
+  },
+  rewardIconOverlayGreen: {
+    backgroundColor: '#1B5E20', // Dark green to match The Green Florist logo
+  },
+  rewardIcon: {
+    fontSize: 32,
+  },
+  rewardImage: {
+    width: 60,
+    height: 60,
+  },
+  rewardCount: {
+    fontSize: 11,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  goodieCard: {
+    width: RECTANGULAR_CARD_WIDTH,
+    backgroundColor: Colors.neutral[50],
+    borderRadius: 12,
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  goodieImagePlaceholder: {
+    width: '100%',
+    height: 150,
+    backgroundColor: Colors.neutral[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goodieImage: {
+    width: '100%',
+    height: 150,
+    backgroundColor: Colors.neutral[50],
+  },
+  placeholderText: {
+    color: Colors.text.light,
+    fontSize: 14,
+  },
+  goodieTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goodieTitleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  newText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.secondary, // Orange color
+  },
+  rotatingImageContainer: {
+    width: '100%',
+    height: 150,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  rotatingImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    top: 0,
+    left: 0,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    marginHorizontal: -6,
+  },
+  featureCard: {
+    width: (SCREEN_WIDTH - 44) / 2,
+    aspectRatio: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.neutral[200],
+    overflow: 'hidden',
+    margin: 6,
+  },
+  featureCardTopBorder: {
+    height: 4,
+    backgroundColor: Colors.secondary,
+    width: '100%',
+  },
+  featureCardContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  featureCardTop: {
+    alignItems: 'flex-end',
+  },
+  featureCardBottom: {
+    alignItems: 'flex-start',
+  },
+  featureIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featureIcon: {
+    fontSize: 24,
+  },
+  featureImage: {
+    width: 62.5, // 25% larger than 50
+    height: 62.5, // 25% larger than 50
+  },
+  featureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 8,
+  },
+  featureNavButton: {
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  featureNavButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.background,
+  },
+  ctaButton: {
+    width: '100%',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.grey,
+    backgroundColor: Colors.background,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: 120,
+  },
+  ctaImage: {
+    width: '100%',
+    height: 72, // 40% smaller than 120 (120 * 0.6 = 72)
+    position: 'absolute',
+    top: 20,
+    left: 0,
+  },
+  ctaTextContainer: {
+    position: 'absolute',
+    top: 41, // Half of image height (72/2 = 36) + 15px - 10px (raised by 10px)
+    left: 20,
+  },
+  ctaCompetitionText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'left',
+  },
+  ctaButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 4,
+  },
+  ctaButtonSubtext: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+});
+
+export default HomeScreen;
+
