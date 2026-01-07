@@ -17,8 +17,8 @@ if (fs.existsSync(indexPath)) {
   <meta name="apple-mobile-web-app-title" content="Canny Carrot" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
-  <link rel="apple-touch-icon" href="/icon-192.svg" />`;
+  <link rel="icon" type="image/png" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />`;
   
   html = html.replace('<head>', `<head>${pwaMetaTags}`);
   
@@ -28,20 +28,31 @@ if (fs.existsSync(indexPath)) {
   console.warn('⚠️  index.html not found in dist/');
 }
 
-// 2. Copy manifest.json and icons
-const filesToCopy = ['manifest.json', 'icon-192.svg', 'icon-512.svg'];
+// 2. Copy manifest.json
+const manifestSrc = path.join(publicDir, 'manifest.json');
+const manifestDst = path.join(distDir, 'manifest.json');
+if (fs.existsSync(manifestSrc)) {
+  fs.copyFileSync(manifestSrc, manifestDst);
+  console.log('✅ Copied manifest.json');
+} else {
+  console.warn('⚠️  manifest.json not found in public/');
+}
 
-filesToCopy.forEach(file => {
-  const src = path.join(publicDir, file);
-  const dst = path.join(distDir, file);
-  
-  if (fs.existsSync(src)) {
-    fs.copyFileSync(src, dst);
-    console.log(`✅ Copied ${file}`);
-  } else {
-    console.warn(`⚠️  ${file} not found in public/`);
-  }
-});
+// 3. Copy logo files from assets to dist as PWA icons
+const assetsDir = path.join(__dirname, 'assets');
+const logoFile = 'cropped-cc-app-logo.png';
+const logoSrc = path.join(assetsDir, logoFile);
+
+if (fs.existsSync(logoSrc)) {
+  // Copy as both 192 and 512 (browser will scale as needed)
+  const icon192Dst = path.join(distDir, 'icon-192.png');
+  const icon512Dst = path.join(distDir, 'icon-512.png');
+  fs.copyFileSync(logoSrc, icon192Dst);
+  fs.copyFileSync(logoSrc, icon512Dst);
+  console.log(`✅ Copied ${logoFile} as icon-192.png and icon-512.png`);
+} else {
+  console.warn(`⚠️  ${logoFile} not found in assets/`);
+}
 
 console.log('✅ PWA injection complete');
 
