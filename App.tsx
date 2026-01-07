@@ -21,6 +21,11 @@ if (Platform.OS === 'web' && typeof console !== 'undefined') {
         errorMsg.includes('[Background] Continuum')) {
       return; // Suppress React Native internal errors
     }
+    // Always log [App] prefixed errors (critical app errors)
+    if (errorMsg.includes('[App]')) {
+      originalError.apply(console, args);
+      return;
+    }
     originalError.apply(console, args);
   };
 }
@@ -67,27 +72,63 @@ function App(): React.JSX.Element {
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [rewards, setRewards] = useState<CustomerReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  
+  // Log when component mounts
+  useEffect(() => {
+    console.log('[App] Component mounted');
+    console.log('[App] Platform:', Platform.OS);
+    return () => {
+      console.log('[App] Component unmounting');
+    };
+  }, []);
 
   // Load rewards on mount and when rewards change
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
-        const loadedRewards = await loadRewards();
-        console.log('[App] Loaded rewards on mount:', loadedRewards.length, 'rewards');
-        setRewards(loadedRewards || []);
+        // Add timeout to loadRewards call itself
+        const loadPromise = loadRewards();
+        const timeoutPromise = new Promise<CustomerReward[]>((resolve) => {
+          setTimeout(() => {
+            console.warn('[App] Load rewards timeout, using empty array');
+            resolve([]);
+          }, 3000);
+        });
+        
+        const loadedRewards = await Promise.race([loadPromise, timeoutPromise]);
+        
+        if (isMounted) {
+          console.log('[App] Loaded rewards on mount:', loadedRewards?.length || 0, 'rewards');
+          setRewards(loadedRewards || []);
+          setIsLoading(false);
+          setHasError(false);
+        }
       } catch (error) {
-        console.error('Error loading rewards:', error);
-        setRewards([]); // Set empty array on error
-      } finally {
-        setIsLoading(false);
+        console.error('[App] Error loading rewards:', error);
+        if (isMounted) {
+          setRewards([]);
+          setIsLoading(false);
+          setHasError(true);
+        }
       }
     };
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
+    
     loadData();
-    return () => clearTimeout(timeout);
+    
+    // Fallback timeout - always clear loading after 5 seconds
+    const fallbackTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn('[App] Fallback timeout: forcing loading state to false');
+        setIsLoading(false);
+      }
+    }, 5000);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimeout);
+    };
   }, []);
   
   // Also reload rewards when screen changes to Home (in case rewards were updated)
@@ -523,18 +564,45 @@ function App(): React.JSX.Element {
     }
   };
 
-  // Show loading state
+  // Show loading state with visible indicator
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text>Loading...</Text>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: '#fff', 
+        minHeight: '100vh',
+        padding: 20
+      }}>
+        <Text style={{ fontSize: 18, color: '#000', fontWeight: 'bold', marginBottom: 10 }}>Canny Carrot</Text>
+        <Text style={{ fontSize: 16, color: '#666' }}>Loading...</Text>
       </View>
+    );
+  }
+  
+  // Show error state if needed (fallback)
+  if (hasError && rewards.length === 0 && currentScreen === 'Home') {
+    console.warn('[App] Showing error fallback - continuing anyway');
+  }
+
+  // Ensure screen always renders - fallback if renderScreen returns null
+  const screenContent = renderScreen();
+  if (!screenContent) {
+    console.error('[App] renderScreen returned null/undefined, falling back to HomeScreen');
+    return (
+      <HomeScreen
+        currentScreen="Home"
+        onNavigate={handleNavigate}
+        onScanPress={handleScanPress}
+        rewards={rewards}
+      />
     );
   }
 
   return (
     <>
-      {renderScreen()}
+      {screenContent}
       <ScanModal
         visible={scanModalVisible}
         onClose={() => setScanModalVisible(false)}
