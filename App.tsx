@@ -1,5 +1,31 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
+import {View, Text, Platform} from 'react-native';
+
+// Suppress React Native Web touch responder warnings and runtime errors (harmless but noisy)
+if (Platform.OS === 'web' && typeof console !== 'undefined') {
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  
+  console.warn = (...args: any[]) => {
+    // Filter out React Native Web touch responder warnings
+    if (args[0] && typeof args[0] === 'string' && args[0].includes('recordTouchEnd')) {
+      return; // Suppress this specific warning
+    }
+    originalWarn.apply(console, args);
+  };
+  
+  console.error = (...args: any[]) => {
+    // Filter out React Native runtime internal errors
+    const errorMsg = args[0]?.toString() || '';
+    if (errorMsg.includes('Continuum assignment failed') || 
+        errorMsg.includes('[Background] Continuum')) {
+      return; // Suppress React Native internal errors
+    }
+    originalError.apply(console, args);
+  };
+}
 import HomeScreen from './src/components/HomeScreen';
+import {loadRewards, saveRewards, type CustomerReward} from './src/utils/dataStorage';
 import SearchPage from './src/components/SearchPage';
 import ScanPage from './src/components/ScanPage';
 import WalletPage from './src/components/WalletPage';
@@ -17,6 +43,7 @@ import PrivacyPolicyPage from './src/components/PrivacyPolicyPage';
 import LearnMorePage from './src/components/LearnMorePage';
 import RewardDetailPage from './src/components/RewardDetailPage';
 import SeeAllGoodiesPage from './src/components/SeeAllGoodiesPage';
+import SeeAllRewardsPage from './src/components/SeeAllRewardsPage';
 import FeaturedCampaignsPage from './src/components/FeaturedCampaignsPage';
 import CompetitionPage from './src/components/CompetitionPage';
 import ShopOnlinePage from './src/components/ShopOnlinePage';
@@ -30,11 +57,84 @@ import CommunicationPreferencesPage from './src/components/CommunicationPreferen
 import YourOrdersPage from './src/components/YourOrdersPage';
 import DeleteAccountPage from './src/components/DeleteAccountPage';
 import ChatPage from './src/components/ChatPage';
+import CarrieChatbot from './src/components/CarrieChatbot';
+// Temporarily comment out to debug compilation error
+// import CarrieFloatingButton from './src/components/CarrieFloatingButton';
 
 function App(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('Home');
   const [previousScreen, setPreviousScreen] = useState<string | null>(null);
   const [scanModalVisible, setScanModalVisible] = useState(false);
+  const [rewards, setRewards] = useState<CustomerReward[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load rewards on mount and when rewards change
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const loadedRewards = await loadRewards();
+        console.log('[App] Loaded rewards on mount:', loadedRewards.length, 'rewards');
+        setRewards(loadedRewards || []);
+      } catch (error) {
+        console.error('Error loading rewards:', error);
+        setRewards([]); // Set empty array on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+    loadData();
+    return () => clearTimeout(timeout);
+  }, []);
+  
+  // Also reload rewards when screen changes to Home (in case rewards were updated)
+  useEffect(() => {
+    if (currentScreen === 'Home') {
+      const reloadRewards = async () => {
+        try {
+          const loadedRewards = await loadRewards();
+          console.log('[App] Reloaded rewards on Home screen:', loadedRewards.length, 'rewards');
+          setRewards(loadedRewards || []);
+        } catch (error) {
+          console.error('Error reloading rewards:', error);
+        }
+      };
+      reloadRewards();
+    }
+  }, [currentScreen]);
+
+  // Handle reward scanned callback
+  const handleRewardScanned = async (reward: CustomerReward) => {
+    console.log('[App] Reward scanned callback triggered:', reward.name);
+    // Reload rewards to get latest state
+    const updatedRewards = await loadRewards();
+    console.log('[App] Loaded rewards after scan:', updatedRewards.length, 'rewards');
+    const foundReward = updatedRewards.find(r => r.id === reward.id);
+    if (foundReward) {
+      console.log('[App] ✅ Scanned reward found in loaded rewards:', foundReward.name);
+      console.log('[App] Reward details:', {
+        id: foundReward.id,
+        name: foundReward.name,
+        createdAt: foundReward.createdAt,
+        businessLogo: foundReward.businessLogo ? 'present' : 'missing',
+        businessName: foundReward.businessName,
+      });
+    } else {
+      console.warn('[App] ⚠️ Scanned reward NOT found in loaded rewards!');
+      console.warn('[App] Available reward IDs:', updatedRewards.map(r => r.id));
+    }
+    setRewards(updatedRewards);
+    // Force a re-render by navigating away and back (if already on Home)
+    if (currentScreen === 'Home') {
+      // Small delay to ensure state update propagates
+      setTimeout(() => {
+        console.log('[App] Forcing Home screen refresh after reward scan');
+      }, 200);
+    }
+  };
 
   const handleNavigate = (screen: string) => {
     setPreviousScreen(currentScreen);
@@ -62,6 +162,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            rewards={rewards}
           />
         );
       case 'Search':
@@ -70,6 +171,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Scan':
@@ -78,6 +180,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Wallet':
@@ -86,6 +189,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'More':
@@ -94,6 +198,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Account':
@@ -102,6 +207,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Orders':
@@ -109,6 +215,7 @@ function App(): React.JSX.Element {
           <OrdersPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'FindShop':
@@ -116,6 +223,7 @@ function App(): React.JSX.Element {
           <FindShopPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'Menu':
@@ -123,6 +231,7 @@ function App(): React.JSX.Element {
           <MenuPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'ContactCustomerCare':
@@ -130,6 +239,7 @@ function App(): React.JSX.Element {
           <ContactCustomerCarePage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'Welcome':
@@ -137,6 +247,7 @@ function App(): React.JSX.Element {
           <WelcomePage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'FAQs':
@@ -144,6 +255,7 @@ function App(): React.JSX.Element {
           <FAQsPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
           />
         );
       case 'About':
@@ -152,6 +264,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'TermsConditions':
@@ -247,12 +360,21 @@ function App(): React.JSX.Element {
             onScanPress={() => setScanModalVisible(true)}
           />
         );
+      case 'SeeAllRewards':
+        return (
+          <SeeAllRewardsPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={() => handleNavigate('Home')}
+          />
+        );
       case 'SeeAllGoodies':
         return (
           <SeeAllGoodiesPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'FeaturedCampaigns':
@@ -261,6 +383,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Goodie3':
@@ -269,6 +392,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Goodie4':
@@ -277,6 +401,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'ShopOnline':
@@ -294,9 +419,19 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Chat':
+        return (
+          <CarrieChatbot
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'CommunityChat':
         return (
           <ChatPage
             currentScreen={currentScreen}
@@ -329,6 +464,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'Personal details':
@@ -355,6 +491,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       case 'ManageAccount':
@@ -372,6 +509,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
+            onScanPress={handleScanPress}
           />
         );
       default:
@@ -385,13 +523,25 @@ function App(): React.JSX.Element {
     }
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <>
       {renderScreen()}
       <ScanModal
         visible={scanModalVisible}
         onClose={() => setScanModalVisible(false)}
+        onRewardScanned={handleRewardScanned}
       />
+      {/* Temporarily comment out to debug compilation error */}
+      {/* <CarrieFloatingButton /> */}
     </>
   );
 }

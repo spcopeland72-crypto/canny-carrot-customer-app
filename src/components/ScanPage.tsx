@@ -7,6 +7,7 @@ interface ScanPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -16,11 +17,13 @@ const ScanPage: React.FC<ScanPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
   return (
     <PageTemplate
       title="More Canny Carrot"
       currentScreen={currentScreen}
+      onScanPress={onScanPress}
       onNavigate={onNavigate}
       onBack={onBack}>
       <View style={styles.content}>

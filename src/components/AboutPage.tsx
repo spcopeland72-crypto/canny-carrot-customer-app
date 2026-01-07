@@ -17,12 +17,14 @@ interface AboutPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const AboutPage: React.FC<AboutPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
   const videoRef = useRef<any>(null);
 
@@ -163,7 +165,7 @@ const AboutPage: React.FC<AboutPageProps> = ({
       <BottomNavigation
         currentScreen={currentScreen}
         onNavigate={onNavigate}
-        onScanPress={() => {}}
+        onScanPress={onScanPress}
       />
     </SafeAreaView>
   );

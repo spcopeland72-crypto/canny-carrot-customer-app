@@ -1,176 +1,255 @@
 /**
- * QR Code Utility Functions
- * Helper functions for QR code processing and validation
+ * Shared QR Code Utilities
+ * 
+ * This module provides consistent QR code generation and parsing
+ * for reward codes, campaign codes, and business codes.
+ * 
+ * Formats:
+ * - Reward: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
+ * - Company: COMPANY:{number}:{name}
+ * - Campaign: CAMPAIGN:{id}:{name}:{description}
  */
 
-export interface QRCodeData {
-  data: string;
-  type: string;
-  timestamp: Date;
+export interface ParsedRewardQR {
+  id: string;
+  name: string;
+  requirement: number;
+  pointsPerPurchase?: number; // Points allocated per purchase/action (default: 1)
+  rewardType: string;
+  products: string[];
+  pinCode?: string; // PIN code for redemption
+  business?: {
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    logo?: string; // Business logo/icon
+    socialMedia?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+      tiktok?: string;
+      linkedin?: string;
+    };
+  };
 }
 
-export interface QRCodeValidationResult {
-  isValid: boolean;
-  message?: string;
-  parsedData?: any;
+export interface ParsedCompanyQR {
+  number: string;
+  name: string;
 }
+
+export interface ParsedCampaignQR {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export type ParsedQR = 
+  | { type: 'reward'; data: ParsedRewardQR }
+  | { type: 'company'; data: ParsedCompanyQR }
+  | { type: 'campaign'; data: ParsedCampaignQR }
+  | { type: 'unknown'; data: null };
 
 /**
- * Parse and validate QR code data
- * @param data - Raw QR code data string
- * @param type - Barcode type
- * @returns Validation result with parsed data
+ * Generate QR code for a reward
+ * Format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
  */
-export const validateQRCode = (
-  data: string,
-  type: string
-): QRCodeValidationResult => {
-  if (!data || data.trim().length === 0) {
-    return {
-      isValid: false,
-      message: 'QR code data is empty',
-    };
-  }
-
-  // Check if it's a URL
-  if (isValidURL(data)) {
-    return {
-      isValid: true,
-      message: 'Valid URL QR code',
-      parsedData: {type: 'url', url: data},
-    };
-  }
-
-  // Check if it's JSON
-  try {
-    const jsonData = JSON.parse(data);
-    return {
-      isValid: true,
-      message: 'Valid JSON QR code',
-      parsedData: {type: 'json', data: jsonData},
-    };
-  } catch (e) {
-    // Not JSON, continue
-  }
-
-  // Check if it's a reward code (alphanumeric, 8-16 characters)
-  if (/^[A-Z0-9]{8,16}$/i.test(data)) {
-    return {
-      isValid: true,
-      message: 'Valid reward code',
-      parsedData: {type: 'reward', code: data},
-    };
-  }
-
-  // Default: return as plain text
-  return {
-    isValid: true,
-    message: 'Plain text QR code',
-    parsedData: {type: 'text', text: data},
-  };
+export const generateRewardQRCode = (
+  id: string,
+  name: string,
+  requirement: number,
+  rewardType: 'free_product' | 'discount' | 'other',
+  products?: string[]
+): string => {
+  const productsValue = products && products.length > 0
+    ? products.join(',')
+    : '';
+  return `REWARD:${id}:${name}:${requirement}:${rewardType}:${productsValue}`;
 };
 
 /**
- * Check if a string is a valid URL
- * @param string - String to validate
- * @returns True if valid URL
+ * Generate QR code for a company/business
+ * Format: COMPANY:{number}:{name}
+ * Number should be 7 digits (0000001-1000000)
  */
-const isValidURL = (string: string): boolean => {
+export const generateCompanyQRCode = (
+  businessNumber: string | number,
+  name: string
+): string => {
+  // Ensure number is 7 digits
+  const numberStr = typeof businessNumber === 'number'
+    ? businessNumber.toString().padStart(7, '0')
+    : businessNumber.padStart(7, '0');
+  return `COMPANY:${numberStr}:${name}`;
+};
+
+/**
+ * Generate QR code for a campaign
+ * Format: CAMPAIGN:{id}:{name}:{description}
+ */
+export const generateCampaignQRCode = (
+  id: string,
+  name: string,
+  description: string = ''
+): string => {
+  return `CAMPAIGN:${id}:${name}:${description}`;
+};
+
+/**
+ * Parse QR code - handles JSON format (from business app) and legacy REWARD/COMPANY/CAMPAIGN formats
+ */
+export const parseQRCode = (qrValue: string): ParsedQR => {
+  if (!qrValue || typeof qrValue !== 'string') {
+    return { type: 'unknown', data: null };
+  }
+  
+  const normalizedQr = qrValue.trim();
+  
+  // Try to parse as JSON first (new format from business app)
   try {
-    const url = new URL(string);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch (_) {
+    const parsed = JSON.parse(normalizedQr);
+    if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
+      return {
+        type: 'reward',
+        data: {
+          id: parsed.reward.id,
+          name: parsed.reward.name || 'Unnamed Reward',
+          requirement: parsed.reward.requirement || 1,
+          pointsPerPurchase: parsed.reward.pointsPerPurchase || 1, // Default to 1 point per transaction
+          rewardType: parsed.reward.rewardType || 'free_product',
+          products: parsed.reward.products || [],
+          pinCode: parsed.reward.pinCode || '',
+          business: parsed.business ? {
+            name: parsed.business.name || '',
+            address: parsed.business.address || '',
+            phone: parsed.business.phone || '',
+            email: parsed.business.email || '',
+            website: parsed.business.website || '',
+            logo: parsed.business.logo || '', // Include business logo
+            socialMedia: parsed.business.socialMedia || {},
+          } : undefined,
+        },
+      };
+    }
+  } catch (e) {
+    // Not JSON, continue with legacy format parsing
+  }
+  
+  // Handle COMPANY QR codes (business QR codes)
+  if (normalizedQr.startsWith('COMPANY:')) {
+    const parts = normalizedQr.split(':');
+    if (parts.length >= 3) {
+      return {
+        type: 'company',
+        data: {
+          number: parts[1] || '',
+          name: parts.slice(2).join(':') || 'Business',
+        },
+      };
+    }
+    return { type: 'unknown', data: null };
+  }
+  
+  // Handle CAMPAIGN QR codes
+  if (normalizedQr.startsWith('CAMPAIGN:')) {
+    const parts = normalizedQr.split(':');
+    if (parts.length >= 3) {
+      return {
+        type: 'campaign',
+        data: {
+          id: parts[1] || '',
+          name: parts[2] || 'Campaign',
+          description: parts.slice(3).join(':') || '',
+        },
+      };
+    }
+    return { type: 'unknown', data: null };
+  }
+  
+  // Handle REWARD QR codes
+  if (normalizedQr.startsWith('REWARD:')) {
+    const withoutPrefix = normalizedQr.substring(7); // Remove 'REWARD:'
+    const parts = withoutPrefix.split(':');
+    
+    if (parts.length < 2) {
+      return { type: 'unknown', data: null };
+    }
+    
+    if (parts.length >= 5) {
+      // Full format: {id}:{name}:{requirement}:{rewardType}:{products}
+      const id = parts[0] || 'unknown';
+      const productsStr = parts[parts.length - 1] || '';
+      const rewardType = parts[parts.length - 2] || 'free_product';
+      const requirement = parseInt(parts[parts.length - 3], 10) || 1;
+      // Everything between id and requirement is the name
+      const name = parts.slice(1, parts.length - 3).join(':') || 'Unnamed Reward';
+      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
+      
+      return {
+        type: 'reward',
+        data: {
+          id,
+          name,
+          requirement,
+          rewardType,
+          products,
+        },
+      };
+    } else {
+      // Minimal format: {id}:{name} (or {id}:{name}:{requirement} etc.)
+      const id = parts[0] || 'unknown';
+      const name = parts.slice(1).join(':') || 'Unnamed Reward';
+      
+      return {
+        type: 'reward',
+        data: {
+          id,
+          name,
+          requirement: 1,
+          rewardType: 'free_product',
+          products: [],
+        },
+      };
+    }
+  }
+  
+  return { type: 'unknown', data: null };
+};
+
+/**
+ * Check if QR code is valid (JSON format or starts with known prefix)
+ */
+export const isValidQRCode = (qrValue: string): boolean => {
+  if (!qrValue || typeof qrValue !== 'string') {
     return false;
   }
-};
-
-/**
- * Format QR code data for display
- * @param data - Raw QR code data
- * @param maxLength - Maximum length to display
- * @returns Formatted string
- */
-export const formatQRCodeData = (data: string, maxLength: number = 50): string => {
-  if (data.length <= maxLength) {
-    return data;
-  }
-  return data.substring(0, maxLength) + '...';
-};
-
-/**
- * Log QR code scan event
- * @param qrCodeData - QR code data object
- */
-export const logQRScan = (qrCodeData: QRCodeData): void => {
-  console.log('[QR Scan]', {
-    type: qrCodeData.type,
-    data: formatQRCodeData(qrCodeData.data, 100),
-    timestamp: qrCodeData.timestamp.toISOString(),
-  });
-};
-
-/**
- * Store QR code scan history
- * @param qrCodeData - QR code data object
- */
-export const storeQRScanHistory = async (
-  qrCodeData: QRCodeData
-): Promise<void> => {
+  const normalized = qrValue.trim();
+  
+  // Check JSON format (new format from business app)
   try {
-    // This would integrate with AsyncStorage or a backend API
-    // For now, just log it
-    logQRScan(qrCodeData);
-    console.log('[QR History] Scan stored successfully');
-  } catch (error) {
-    console.error('[QR History] Failed to store scan:', error);
+    const parsed = JSON.parse(normalized);
+    if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
+      return true;
+    }
+  } catch (e) {
+    // Not JSON, check legacy formats
   }
+  
+  // Check legacy formats
+  return normalized.startsWith('REWARD:') || 
+         normalized.startsWith('COMPANY:') || 
+         normalized.startsWith('CAMPAIGN:');
 };
 
-/**
- * Process scanned QR code based on type
- * @param data - QR code data
- * @param type - Barcode type
- * @returns Processing result
- */
-export const processQRCode = (
-  data: string,
-  type: string
-): {
-  action: 'navigate' | 'reward' | 'info' | 'unknown';
-  payload: any;
-} => {
-  const validation = validateQRCode(data, type);
 
-  if (!validation.isValid || !validation.parsedData) {
-    return {action: 'unknown', payload: {data, type}};
-  }
 
-  switch (validation.parsedData.type) {
-    case 'url':
-      return {
-        action: 'navigate',
-        payload: {url: validation.parsedData.url},
-      };
-    case 'reward':
-      return {
-        action: 'reward',
-        payload: {code: validation.parsedData.code},
-      };
-    case 'json':
-      // Check if JSON contains specific action
-      if (validation.parsedData.data.action) {
-        return {
-          action: validation.parsedData.data.action,
-          payload: validation.parsedData.data,
-        };
-      }
-      return {action: 'info', payload: validation.parsedData.data};
-    default:
-      return {
-        action: 'info',
-        payload: {text: validation.parsedData.text},
-      };
-  }
-};
+
+
+
+
+
+
 
 

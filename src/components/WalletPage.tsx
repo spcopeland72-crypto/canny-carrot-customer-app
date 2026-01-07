@@ -7,6 +7,7 @@ interface WalletPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -16,13 +17,15 @@ const WalletPage: React.FC<WalletPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
   return (
     <PageTemplate
       title="More Canny Carrot"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
-      onBack={onBack}>
+      onBack={onBack}
+      onScanPress={onScanPress}>
       <View style={styles.content}>
         {/* 6 Elements in 3 rows of 2 */}
         {[1, 2, 3].map(row => (

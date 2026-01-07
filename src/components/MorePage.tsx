@@ -13,6 +13,7 @@ interface MorePageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -23,6 +24,7 @@ const MorePage: React.FC<MorePageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
   return (
     <PageTemplate
@@ -30,6 +32,7 @@ const MorePage: React.FC<MorePageProps> = ({
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       showBanner={false}
+      onScanPress={onScanPress}
       onBack={onBack}>
       <View style={styles.content}>
         {/* Top Two Large Buttons */}
@@ -112,6 +115,19 @@ const MorePage: React.FC<MorePageProps> = ({
         {/* Help and Support Section */}
         <View style={styles.helpSection}>
           <Text style={styles.helpTitle}>HELP AND SUPPORT</Text>
+
+          <TouchableOpacity
+            style={[styles.helpItem, styles.carrieItem]}
+            onPress={() => onNavigate('Chat')}>
+            <View style={[styles.helpIconContainer, styles.carrieIconContainer]}>
+              <Text style={styles.carrieEmoji}>🥕</Text>
+            </View>
+            <View style={styles.carrieTextContainer}>
+              <Text style={styles.carrieTitle}>Ask Carrie Carrot</Text>
+              <Text style={styles.carrieSubtitle}>AI Support • Available 24/7</Text>
+            </View>
+            <Text style={styles.helpArrow}>→</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.helpItem}
@@ -391,6 +407,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[200],
   },
+  carrieItem: {
+    backgroundColor: Colors.secondary + '15',
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderBottomWidth: 0,
+  },
   helpIconContainer: {
     width: 32,
     height: 32,
@@ -399,6 +424,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  carrieIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.secondary + '30',
+  },
+  carrieEmoji: {
+    fontSize: 28,
+  },
+  carrieTextContainer: {
+    flex: 1,
+  },
+  carrieTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.secondary,
+    marginBottom: 2,
+  },
+  carrieSubtitle: {
+    fontSize: 13,
+    color: Colors.text.secondary,
   },
   helpIcon: {
     fontSize: 18,

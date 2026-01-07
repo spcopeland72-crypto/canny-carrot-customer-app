@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,81 @@ import {
   StatusBar,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
+import {getCustomerRecord} from '../services/customerRecord';
 
 interface AccountPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const AccountPage: React.FC<AccountPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
+  const [customerName, setCustomerName] = useState('Loading...');
+  const [customerEmail, setCustomerEmail] = useState('Loading...');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Load customer account details
+  useEffect(() => {
+    const loadAccountDetails = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        
+        // Retry logic for reliability
+        let retries = 3;
+        let record = null;
+        
+        while (retries > 0 && !record) {
+          try {
+            record = await getCustomerRecord();
+            if (record && record.profile) {
+              break;
+            }
+          } catch (error) {
+            console.warn(`Account load attempt ${4 - retries} failed:`, error);
+            retries--;
+            if (retries > 0) {
+              // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+        
+        if (record && record.profile) {
+          const fullName = record.profile.firstName && record.profile.lastName
+            ? `${record.profile.firstName} ${record.profile.lastName}`
+            : record.profile.firstName || record.profile.lastName || 'User';
+          setCustomerName(fullName);
+          setCustomerEmail(record.profile.email || 'No email set');
+        } else {
+          // Fallback to device-based name if no profile
+          setCustomerName('User');
+          setCustomerEmail('No email set');
+        }
+      } catch (error) {
+        console.error('Error loading account details:', error);
+        setLoadError('Failed to load account details');
+        setCustomerName('User');
+        setCustomerEmail('No email set');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadAccountDetails();
+  }, []);
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -55,22 +115,36 @@ const AccountPage: React.FC<AccountPageProps> = ({
               <Text style={styles.avatarIcon}>👤</Text>
             </View>
           </View>
-          <TextInput
-            style={styles.nameInput}
-            value="Simon Copeland"
-            editable={true}
-            placeholder="Name"
-            placeholderTextColor={Colors.primary}
-          />
-          <TextInput
-            style={styles.emailInput}
-            value="Copeland_simon@yahoo.co.uk"
-            editable={true}
-            placeholder="Email"
-            placeholderTextColor={Colors.text.secondary}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.loadingText}>Loading account...</Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.nameInput}
+                value={customerName}
+                editable={true}
+                placeholder="Name"
+                placeholderTextColor={Colors.primary}
+                onChangeText={setCustomerName}
+              />
+              <TextInput
+                style={styles.emailInput}
+                value={customerEmail}
+                editable={true}
+                placeholder="Email"
+                placeholderTextColor={Colors.text.secondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onChangeText={setCustomerEmail}
+              />
+              {loadError && (
+                <Text style={styles.errorText}>{loadError}</Text>
+              )}
+            </>
+          )}
         </View>
 
         {/* Account Options List */}
@@ -162,7 +236,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <BottomNavigation currentScreen={currentScreen} onNavigate={onNavigate} />
+      <BottomNavigation currentScreen={currentScreen} onNavigate={onNavigate} onScanPress={onScanPress} />
     </SafeAreaView>
   );
 };
@@ -382,6 +456,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.background,
     transform: [{rotate: '-45deg'}],
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: Colors.text.secondary,
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#FF6B35',
+    textAlign: 'center',
   },
 });
 

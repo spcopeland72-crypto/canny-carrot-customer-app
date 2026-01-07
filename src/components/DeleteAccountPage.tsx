@@ -7,6 +7,7 @@ interface DeleteAccountPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;

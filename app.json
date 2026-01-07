@@ -1,13 +1,16 @@
 {
   "expo": {
     "name": "Canny Carrot",
-    "slug": "canny-carrot-mobile-app",
+    "slug": "canny-carrot-customer-app",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/logo.png",
     "splash": {
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FF6B35"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -15,32 +18,100 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cannycarrot.app",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app needs camera access to scan QR codes for rewards and promotions.",
-        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+        "NSLocationWhenInUseUsageDescription": "Canny Carrot needs your location to find nearby businesses and notify you of rewards",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Canny Carrot needs your location to alert you when you're near participating businesses",
+        "NSCameraUsageDescription": "Canny Carrot needs camera access to scan QR codes for stamps",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification",
+          "location",
+          "fetch",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "associatedDomains": [
+        "applinks:cannycarrot.com",
+        "applinks:cannycarrot.com"
+      ],
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_IOS_KEY"
       }
     },
     "android": {
       "package": "com.cannycarrot.app",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#FF6B35"
+      },
       "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "CAMERA",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_ANDROID_KEY"
+        }
+      }
     },
-    "web": {},
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Canny Carrot uses your location to find nearby businesses with rewards.",
+          "locationAlwaysPermission": "Canny Carrot uses your location to notify you when you're near participating businesses.",
+          "locationWhenInUsePermission": "Canny Carrot uses your location to show you nearby businesses."
+        }
+      ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Canny Carrot to access your camera to scan QR codes for rewards."
+          "cameraPermission": "Allow Canny Carrot to access your camera to scan QR codes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo.png",
+          "color": "#FF6B35"
         }
       ]
     ],
+    "notification": {
+      "icon": "./assets/logo.png",
+      "color": "#FF6B35",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Canny Carrot"
+    },
     "extra": {
       "eas": {
-        "projectId": "50b74f9a-d258-4fda-a9fe-d73f5bd2db05"
-      }
-    }
+        "projectId": "1112cdaf-b99b-4a72-a6e6-b31891ed1e46"
+      },
+      "apiUrl": "http://localhost:3001",
+      "stripePublishableKey": "pk_test_51ScwkeDHSurbVejhGnt9ePMBcN2fJFlmrWV324cPXH5axBub0KyRlu3PnsjfeVnnTD0XSWTPMaUchZSx3IZ27oEK00vX5UUqwJ"
+    },
+    "owner": "canny-carrot-rewards",
+    "updates": {
+      "enabled": false
+    },
+    "runtimeVersion": "1.0.0"
   }
 }

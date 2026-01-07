@@ -9,10 +9,17 @@ import {
   Image,
   Alert,
   Platform,
+  SafeAreaView,
 } from 'react-native';
+// Use Platform-specific safe area handling
 import {CameraView, useCameraPermissions, BarcodeScanningResult} from 'expo-camera';
 import {Colors} from '../constants/Colors';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
+import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
+import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
+import {queueOperation} from '../services/syncManager';
+import {getDeviceId} from '../services/localStorage';
+import {recordRewardScan} from '../services/customerRecord';
 
 // Check if browser supports native BarcodeDetector API
 const supportsBarcodeDetector = (): boolean => {
@@ -39,32 +46,40 @@ try {
   calvinImage = null;
 }
 
-// Parse QR code - format: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
-const parseRewardQRCode = (qrValue: string): {
+// Helper function to convert parsed QR to reward format (for backward compatibility)
+const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
   id: string;
   name: string;
   requirement: number;
   rewardType: string;
   products: string[];
+  pinCode?: string;
+  business?: {
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    socialMedia?: any;
+  };
 } | null => {
-  if (!qrValue || !qrValue.startsWith('REWARD:')) {
-    return null;
-  }
-  const parts = qrValue.split(':');
-  if (parts.length >= 6) {
+  if (parsed.type === 'reward') {
     return {
-      id: parts[1],
-      name: parts[2],
-      requirement: parseInt(parts[3], 10) || 1,
-      rewardType: parts[4] || 'free_product',
-      products: parts[5] ? parts[5].split(',') : [],
+      id: parsed.data.id,
+      name: parsed.data.name,
+      requirement: parsed.data.requirement,
+      rewardType: parsed.data.rewardType,
+      products: parsed.data.products,
+      pinCode: parsed.data.pinCode,
+      business: parsed.data.business,
     };
-  } else if (parts.length >= 3) {
+  } else if (parsed.type === 'company') {
+    // Convert company QR to reward-like format for compatibility
     return {
-      id: parts[1],
-      name: parts.slice(2).join(':'),
+      id: `company-${parsed.data.number}`,
+      name: parsed.data.name,
       requirement: 1,
-      rewardType: 'free_product',
+      rewardType: 'other',
       products: [],
     };
   }
@@ -72,6 +87,8 @@ const parseRewardQRCode = (qrValue: string): {
 };
 
 const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}) => {
+  // Safe area top padding for iOS (status bar + notch)
+  const safeAreaTop = Platform.OS === 'ios' ? 44 : 12;
   const [scanError, setScanError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
@@ -85,6 +102,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
   const [cameraKey, setCameraKey] = useState(0);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraAvailable, setCameraAvailable] = useState<boolean>(true);
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const lastScannedCodeRef = useRef<string | null>(null);
+  const isProcessingRef = useRef<boolean>(false);
   
   // Initialize cameraAvailable to true (we'll rely on permission errors if camera isn't available)
   useEffect(() => {
@@ -98,25 +118,37 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
   useEffect(() => {
     if (visible && Platform.OS !== 'web' && cameraAvailable !== false) {
       console.log('[ScanModal] Modal opened, checking permissions...', { permission, cameraAvailable });
-      try {
-        // Request permission if not already granted
-        if (permission && !permission.granted && permission.canAskAgain) {
+      
+      // Reset camera ready state when modal opens
+      setCameraReady(false);
+      setCameraError(null);
+      
+      // Request permission if not already granted
+      // Note: useCameraPermissions returns undefined initially, then a permission object
+      if (permission === null || permission === undefined) {
+        // Permission state is still loading, wait for it
+        console.log('[ScanModal] Permission state loading, will retry...');
+        // Don't return - let the effect run again when permission loads
+        return;
+      }
+      
+      if (!permission.granted) {
+        if (permission.canAskAgain !== false) {
           console.log('[ScanModal] Requesting camera permission...');
           requestPermission().then((result) => {
             console.log('[ScanModal] Permission result:', result);
+            if (!result.granted) {
+              setCameraError('Camera permission is required to scan QR codes');
+            }
           }).catch((error) => {
             console.error('[ScanModal] Permission request error:', error);
             console.error('[ScanModal] Error details:', JSON.stringify(error, null, 2));
-            setCameraError('Failed to request camera permission');
+            setCameraError('Failed to request camera permission. Please enable it in device settings.');
           });
+        } else {
+          console.log('[ScanModal] Camera permission denied and cannot ask again');
+          setCameraError('Camera permission denied. Please enable it in Settings > Privacy > Camera.');
         }
-        // Reset camera ready state when modal opens
-        setCameraReady(false);
-        setCameraError(null);
-      } catch (error) {
-        console.error('[ScanModal] Error in permission effect:', error);
-        console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
-        setCameraError('Camera initialization error');
       }
     }
   }, [visible, permission, requestPermission, cameraAvailable]);
@@ -128,6 +160,10 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
         setCameraError(null);
         setCameraReady(false);
         setCameraKey(0);
+        setLastScannedCode(null); // Reset scanned code when modal closes
+        // Reset refs for next scan session
+        lastScannedCodeRef.current = null;
+        isProcessingRef.current = false;
         // Clear camera ref safely
         if (cameraRef.current) {
           cameraRef.current = null;
@@ -168,72 +204,279 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
   // Process scanned reward QR code
   const processRewardQRCode = async (qrValue: string) => {
     if (!qrValue || typeof qrValue !== 'string') {
-      console.warn('Invalid QR code value:', qrValue);
+      console.warn('[ScanModal] Invalid QR code value:', qrValue);
       return;
     }
+    
+    // Trim whitespace and normalize
+    const normalizedQr = qrValue.trim();
+    console.log('[ScanModal] Processing QR code:', normalizedQr);
+    
+    // Validate QR code format
+    if (!isValidQRCode(normalizedQr)) {
+      console.warn('[ScanModal] Invalid QR code format:', normalizedQr);
+      isProcessingRef.current = false;
+      Alert.alert(
+        'Invalid QR Code', 
+        `This does not appear to be a valid QR code.\n\nScanned: ${normalizedQr.substring(0, 50)}${normalizedQr.length > 50 ? '...' : ''}`
+      );
+      return;
+    }
+    
     try {
-      const parsed = parseRewardQRCode(qrValue);
-      if (!parsed) {
-        Alert.alert('Invalid QR Code', 'This does not appear to be a valid reward QR code.');
+      // Parse QR code using shared utility
+      const parsed = parseQRCode(normalizedQr);
+      const parsedReward = convertParsedQRToReward(parsed);
+      
+      if (!parsedReward || parsed.type === 'unknown') {
+        console.warn('[ScanModal] Failed to parse QR code:', normalizedQr);
+        isProcessingRef.current = false;
+        Alert.alert(
+          'Invalid QR Code', 
+          `This does not appear to be a valid reward QR code.\n\nScanned: ${normalizedQr.substring(0, 50)}${normalizedQr.length > 50 ? '...' : ''}`
+        );
         return;
+      }
+      
+      console.log('[ScanModal] Successfully parsed QR code:', parsedReward);
+
+      // Extract business info and create/update member business record
+      let businessId = 'default';
+      let businessName = undefined;
+      if (parsedReward.business && parsedReward.business.name) {
+        businessName = parsedReward.business.name;
+        businessId = parsedReward.business.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        
+        // Create or update member business record
+        try {
+          const memberBusiness: MemberBusiness = {
+            id: businessId,
+            name: parsedReward.business.name,
+            address: parsedReward.business.address,
+            phone: parsedReward.business.phone,
+            email: parsedReward.business.email,
+            website: parsedReward.business.website,
+            socialMedia: parsedReward.business.socialMedia || {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await addOrUpdateBusiness(memberBusiness);
+          console.log('[ScanModal] Member business record created/updated:', businessId);
+        } catch (businessError) {
+          console.error('[ScanModal] Error saving member business:', businessError);
+        }
       }
 
       const existingRewards = await loadRewards();
-      let existingReward = existingRewards.find(r => r.id === parsed.id || r.qrCode === qrValue);
+      let existingReward = existingRewards.find(r => r.id === parsedReward.id || r.qrCode === normalizedQr);
       
+      // Get device ID for customer identification
+      const customerId = await getDeviceId();
+      
+      // Use the new customer record service to track rewards properly
+      // Get points per purchase from QR code (default: 1)
+      const pointsPerPurchase = parsed.type === 'reward' && parsed.data.pointsPerPurchase 
+        ? parsed.data.pointsPerPurchase 
+        : 1;
+      const pointsToAdd = pointsPerPurchase; // Points earned per scan
+      const requirement = parsedReward.requirement || 1; // Number of purchases/actions needed
+      const totalPointsRequired = requirement * pointsPerPurchase; // Total points needed to earn reward
+      const rewardType = parsedReward.rewardType as 'free_product' | 'discount' | 'other' || 'free_product';
+      
+      // Debug logging
+      console.log('[ScanModal] QR Code Details:', {
+        pointsPerPurchase,
+        requirement,
+        totalPointsRequired,
+        businessName: parsedReward.business?.name,
+        businessLogo: parsedReward.business?.logo ? 'present' : 'missing',
+      });
+      
+      // Record the scan in the structured customer record (handles active/earned/redeemed)
+      console.log('[ScanModal] Recording reward scan in customer record');
+      const { rewardProgress, isNewlyEarned } = await recordRewardScan(
+        parsedReward.id,
+        parsedReward.name,
+        pointsToAdd,
+        totalPointsRequired, // Total points needed (requirement * pointsPerPurchase)
+        businessId,
+        businessName,
+        rewardType,
+        normalizedQr
+      );
+      
+      // Also maintain backward-compatible simple rewards list
       if (existingReward) {
-        const pointsToAdd = existingReward.requirement || 1;
-        existingReward.pointsEarned = (existingReward.pointsEarned || 0) + pointsToAdd;
-        existingReward.count = Math.min((existingReward.count || 0) + pointsToAdd, existingReward.total);
+        const existingPointsPerPurchase = existingReward.pointsPerPurchase || 1;
+        existingReward.pointsEarned = rewardProgress.pointsEarned;
+        existingReward.count = Math.floor(rewardProgress.pointsEarned / existingPointsPerPurchase); // Current progress (e.g., 1 of 4)
+        existingReward.total = requirement; // Update total if changed
+        existingReward.pointsPerPurchase = pointsPerPurchase; // Update points per purchase
+        existingReward.isEarned = rewardProgress.pointsEarned >= (requirement * pointsPerPurchase);
+        // Update business logo if available
+        if (parsed.type === 'reward' && parsed.data.business?.logo && !existingReward.businessLogo) {
+          existingReward.businessLogo = parsed.data.business.logo;
+        }
+        // Update PIN code and business info if not already set
+        if (parsedReward.pinCode && !existingReward.pinCode) {
+          existingReward.pinCode = parsedReward.pinCode;
+        }
+        if (businessId !== 'default' && !existingReward.businessId) {
+          existingReward.businessId = businessId;
+          existingReward.businessName = businessName;
+        }
         
         const updatedRewards = existingRewards.map(r => 
           r.id === existingReward!.id ? existingReward! : r
         );
-        
         await saveRewards(updatedRewards);
         
-        Alert.alert(
-          'Reward Updated!',
-          `You earned ${pointsToAdd} point(s) for "${parsed.name}"!\nTotal points: ${existingReward.pointsEarned}`,
-          [{text: 'OK', onPress: () => {
-            onRewardScanned?.(existingReward!);
-            onClose();
-          }}]
-        );
+        // Queue sync to Redis
+        console.log('[ScanModal] Queueing reward update for sync to Redis');
+        await queueOperation('update', 'customerReward', existingReward.id, {
+          ...existingReward,
+          customerId,
+          businessId: businessId,
+          lastScannedAt: new Date().toISOString(),
+        });
+        
+        // Verify the reward was saved
+        const verifyRewards = await loadRewards();
+        console.log('[ScanModal] Verified saved rewards after update:', verifyRewards.length, 'rewards found');
+        const savedReward = verifyRewards.find(r => r.id === existingReward.id);
+        if (savedReward) {
+          console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
+        }
+        
+        // Show appropriate message based on whether reward was newly earned
+        if (isNewlyEarned) {
+          Alert.alert(
+            '🎉 Reward Earned!',
+            `Congratulations! You've earned "${parsedReward.name}"!\n\nVisit the business to redeem your reward.`,
+            [{text: 'OK', onPress: () => {
+              isProcessingRef.current = false;
+              // Call callback after a small delay to ensure state is updated
+              setTimeout(() => {
+                onRewardScanned?.(existingReward!);
+              }, 100);
+              onClose();
+            }}]
+          );
+        } else {
+          // Calculate current progress: pointsEarned / requirement (not pointsRequired)
+          const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
+          Alert.alert(
+            'Points Added!',
+            `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!\n\nProgress: ${currentProgress} of ${requirement}`,
+            [{text: 'OK', onPress: () => {
+              isProcessingRef.current = false;
+              // Call callback after a small delay to ensure state is updated
+              setTimeout(() => {
+                onRewardScanned?.(existingReward!);
+              }, 100);
+              onClose();
+            }}]
+          );
+        }
       } else {
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
-        const pointsToAdd = parsed.requirement || 1;
-        const rewardType = parsed.rewardType as 'free_product' | 'discount' | 'other' || 'free_product';
-        const type = parsed.products.length > 0 ? 'product' : 'action';
+        const type = parsedReward.products.length > 0 ? 'product' : 'action';
+        
+        // Use business logo from QR code if available, otherwise random icon
+        const businessLogo = parsed.type === 'reward' && parsed.data.business?.logo 
+          ? parsed.data.business.logo 
+          : undefined;
+        const rewardIcon = businessLogo ? undefined : icons[Math.floor(Math.random() * icons.length)];
         
         const newReward: CustomerReward = {
-          id: parsed.id,
-          name: parsed.name,
-          count: pointsToAdd,
-          total: parsed.requirement * 10,
-          icon: icons[Math.floor(Math.random() * icons.length)],
+          id: parsedReward.id,
+          name: parsedReward.name,
+          count: Math.floor(rewardProgress.pointsEarned / pointsPerPurchase), // Current progress (e.g., 1 of 4)
+          total: requirement, // Total purchases/actions needed (e.g., 4)
+          icon: rewardIcon,
+          businessLogo: businessLogo, // Store business logo if available
           type: type,
-          requirement: parsed.requirement,
+          requirement: requirement,
+          pointsPerPurchase: pointsPerPurchase, // Store points per purchase
           rewardType: rewardType,
-          selectedProducts: parsed.products.length > 0 ? parsed.products : undefined,
-          qrCode: qrValue,
-          pointsEarned: pointsToAdd,
+          selectedProducts: parsedReward.products.length > 0 ? parsedReward.products : undefined,
+          qrCode: normalizedQr,
+          pointsEarned: rewardProgress.pointsEarned,
+          pinCode: parsedReward.pinCode,
+          businessId: businessId !== 'default' ? businessId : undefined,
+          businessName: businessName,
+          isEarned: rewardProgress.pointsEarned >= totalPointsRequired,
+          createdAt: new Date().toISOString(), // Add timestamp so it appears in carousel
+          lastScannedAt: new Date().toISOString(), // Track last scan time
         };
+        
+        console.log('[ScanModal] Creating new reward:', {
+          id: newReward.id,
+          name: newReward.name,
+          pointsPerPurchase: newReward.pointsPerPurchase,
+          requirement: newReward.requirement,
+          total: newReward.total,
+          businessLogo: newReward.businessLogo ? 'present' : 'missing',
+          businessName: newReward.businessName,
+        });
         
         const updatedRewards = [...existingRewards, newReward];
         await saveRewards(updatedRewards);
+        console.log('[ScanModal] Reward saved successfully, total rewards:', updatedRewards.length);
         
-        Alert.alert(
-          'New Reward Added!',
-          `Reward "${parsed.name}" has been added to your rewards!\nYou earned ${pointsToAdd} point(s).`,
-          [{text: 'OK', onPress: () => {
-            onRewardScanned?.(newReward);
-            onClose();
-          }}]
-        );
+        // Queue sync to Redis
+        console.log('[ScanModal] Queueing new reward for sync to Redis');
+        await queueOperation('create', 'customerReward', newReward.id, {
+          ...newReward,
+          customerId,
+          businessId: businessId,
+          createdAt: new Date().toISOString(),
+          lastScannedAt: new Date().toISOString(),
+        });
+        
+        // Verify the reward was saved by reloading
+        const verifyRewards = await loadRewards();
+        console.log('[ScanModal] Verified saved rewards:', verifyRewards.length, 'rewards found');
+        const savedReward = verifyRewards.find(r => r.id === newReward.id);
+        if (savedReward) {
+          console.log('[ScanModal] ✅ New reward confirmed in storage:', savedReward.name);
+        } else {
+          console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
+        }
+        
+        // Show appropriate message
+        if (isNewlyEarned) {
+          Alert.alert(
+            '🎉 Reward Earned!',
+            `Congratulations! You've earned "${parsedReward.name}" on your first scan!\n\nVisit the business to redeem your reward.`,
+            [{text: 'OK', onPress: () => {
+              isProcessingRef.current = false;
+              // Call callback after a small delay to ensure state is updated
+              setTimeout(() => {
+                onRewardScanned?.(newReward);
+              }, 100);
+              onClose();
+            }}]
+          );
+        } else {
+          const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
+          Alert.alert(
+            'New Reward Started!',
+            `You've started earning "${parsedReward.name}"!\n\nProgress: ${currentProgress} of ${requirement}`,
+            [{text: 'OK', onPress: () => {
+              isProcessingRef.current = false;
+              // Call callback after a small delay to ensure state is updated
+              setTimeout(() => {
+                onRewardScanned?.(newReward);
+              }, 100);
+              onClose();
+            }}]
+          );
+        }
       }
     } catch (error) {
       console.error('Error processing reward QR code:', error);
+      isProcessingRef.current = false;
       Alert.alert('Error', 'Failed to process reward QR code. Please try again.');
     }
   };
@@ -504,7 +747,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
       onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={[styles.closeButton, {top: safeAreaTop}]} onPress={onClose}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
 
@@ -533,9 +776,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
                     <View 
                       nativeID="html5-qrcode-scanner"
                       style={styles.videoContainer}
-                    />
-                  </View>
-                )}
+                />
+              </View>
+            )}
               </View>
             ) : (
               <View style={styles.nativeScannerContainer}>
@@ -556,7 +799,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
                         // Permission state will update automatically via useCameraPermissions hook
                       }}>
                       <Text style={styles.permissionButtonText}>Grant Permission</Text>
-                    </TouchableOpacity>
+            </TouchableOpacity>
                   </View>
                 ) : permission.granted ? (
                   !cameraReady ? (
@@ -565,53 +808,53 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
                     </View>
                   ) : (
                     <View style={styles.cameraContainer}>
-                      {Platform.OS !== 'web' && cameraReady && cameraAvailable !== false && (() => {
-                        console.log('[ScanModal] Rendering CameraView...', { cameraKey, cameraReady, cameraAvailable });
-                        // Use a try-catch wrapper component to prevent crashes
-                        try {
-                          // Delay rendering even more to ensure native module is ready
-                          return (
-                            <View style={{ flex: 1 }}>
-                              <CameraView
-                                key={`camera-${cameraKey}`}
-                                ref={(ref) => {
-                                  console.log('[ScanModal] CameraView ref callback:', ref ? 'valid' : 'null');
-                                  cameraRef.current = ref;
-                                }}
-                                style={styles.camera}
-                                facing="back"
-                                onBarcodeScanned={(result: BarcodeScanningResult) => {
-                                  try {
-                                    console.log('[ScanModal] Barcode scanned:', result?.data);
-                                    if (result && result.data && typeof result.data === 'string') {
-                                      processRewardQRCode(result.data);
-                                    }
-                                  } catch (error) {
-                                    console.error('[ScanModal] Barcode scan processing error:', error);
-                                    console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
-                                    // Don't crash the app, just log the error
-                                  }
-                                }}
-                                barcodeScannerSettings={{
-                                  barcodeTypes: ['qr'],
-                                }}
-                              />
-                            </View>
-                          );
-                        } catch (error) {
-                          console.error('[ScanModal] Error rendering CameraView:', error);
-                          console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
-                          setCameraError(`Camera render error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                          return (
-                            <View style={styles.nativePlaceholder}>
-                              <Text style={styles.scannerText}>Camera Error</Text>
-                              <Text style={styles.scannerSubtext}>
-                                {error instanceof Error ? error.message : 'Unknown error'}
-                              </Text>
-                            </View>
-                          );
-                        }
-                      })()}
+                      {cameraError ? (
+                        <View style={styles.errorContainer}>
+                          <Text style={styles.errorText}>{cameraError}</Text>
+                        </View>
+                      ) : (
+                        <CameraView
+                          key={`camera-${cameraKey}`}
+                          ref={(ref) => {
+                            console.log('[ScanModal] CameraView ref callback:', ref ? 'valid' : 'null');
+                            cameraRef.current = ref;
+                          }}
+                          style={styles.camera}
+                          facing="back"
+                          onBarcodeScanned={(result: BarcodeScanningResult) => {
+                            try {
+                              console.log('[ScanModal] Barcode scanned:', result?.data);
+                              if (result && result.data && typeof result.data === 'string') {
+                                const qrData = result.data.trim();
+                                // Prevent duplicate scans using ref (state is async and unreliable in callbacks)
+                                if (lastScannedCodeRef.current === qrData) {
+                                  console.log('[ScanModal] Duplicate scan ignored');
+                                  return;
+                                }
+                                // Prevent processing while another scan is being processed
+                                if (isProcessingRef.current) {
+                                  console.log('[ScanModal] Already processing, ignoring');
+                                  return;
+                                }
+                                // Mark as processing and update refs
+                                isProcessingRef.current = true;
+                                lastScannedCodeRef.current = qrData;
+                                setLastScannedCode(qrData);
+                                console.log('[ScanModal] Processing QR code:', qrData);
+                                // Process immediately
+                                processRewardQRCode(qrData);
+                              }
+                            } catch (error) {
+                              console.error('[ScanModal] Barcode scan processing error:', error);
+                              console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
+                              isProcessingRef.current = false;
+                            }
+                          }}
+                          barcodeScannerSettings={{
+                            barcodeTypes: ['qr'],
+                          }}
+                        />
+                      )}
                       {cameraError && (
                         <View style={styles.errorOverlay}>
                           <Text style={styles.errorText}>{cameraError}</Text>
@@ -632,9 +875,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
                 ) : (
                   <View style={styles.nativePlaceholder}>
                     <Text style={styles.scannerText}>Camera permission denied</Text>
-                    <Text style={styles.scannerSubtext}>
+                <Text style={styles.scannerSubtext}>
                       Please enable camera access in device settings
-                    </Text>
+                </Text>
                   </View>
                 )}
               </View>
@@ -654,8 +897,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: SCREEN_WIDTH - MODAL_MARGIN * 2,
-    height: SCREEN_HEIGHT - MODAL_MARGIN * 2,
+    width: SCREEN_WIDTH - MODAL_MARGIN * 4, // Smaller width
+    maxWidth: SCREEN_WIDTH * 0.95, // Max 95% of screen width
+    height: SCREEN_HEIGHT - MODAL_MARGIN * 4, // Smaller height
+    maxHeight: SCREEN_HEIGHT * 0.9, // Max 90% of screen height
     backgroundColor: Colors.background,
     borderRadius: 16,
     overflow: 'hidden',

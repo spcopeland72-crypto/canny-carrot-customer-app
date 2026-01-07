@@ -19,6 +19,9 @@ import FindMoreRewardsModal from './FindMoreRewardsModal';
 import ScanModal from './ScanModal';
 import HelpModal from './HelpModal';
 import NotificationsModal from './NotificationsModal';
+import PinEntryModal from './PinEntryModal';
+import CongratulationsModal from './CongratulationsModal';
+import RewardQRCodeModal from './RewardQRCodeModal';
 
 // Import images at module level
 // Path from src/components/ to assets/ is ../../assets/
@@ -237,6 +240,9 @@ interface RewardCard {
   total: number; // Total needed to complete
   icon: string; // Icon name or emoji for now
   image?: any; // Optional image source for logo/image
+  isEarned?: boolean; // Whether reward has been earned (points requirement met)
+  pinCode?: string; // PIN code for redemption
+  qrCode?: string; // QR code value for display
 }
 
 interface GoodieCard {
@@ -256,12 +262,23 @@ interface HomeScreenProps {
   currentScreen?: string;
   onNavigate?: (screen: string) => void;
   onScanPress?: () => void;
+  rewards?: Array<{
+    id: string;
+    name: string;
+    count: number;
+    total: number;
+    icon: string;
+    pointsEarned?: number;
+    isEarned?: boolean;
+    pinCode?: string;
+  }>;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
   currentScreen = 'Home',
   onNavigate = () => {},
   onScanPress = () => {},
+  rewards: propsRewards = [],
 }) => {
   const [userName] = useState('Simon'); // This would come from user context
   const [logoError, setLogoError] = useState(false);
@@ -282,6 +299,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     linkedin?: any;
   }>({});
   const [currentGoldMemberImageIndex, setCurrentGoldMemberImageIndex] = useState(0);
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [congratulationsModalVisible, setCongratulationsModalVisible] = useState(false);
+  const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<RewardCard | null>(null);
+  const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
+  const [selectedRewardForQR, setSelectedRewardForQR] = useState<RewardCard | null>(null);
   const greeting = getTimeBasedGreeting();
 
   // Set online-black.png from module-level variable
@@ -311,15 +333,48 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     });
   }, []);
 
-  // Sample data - replace with actual data
-  const rewardCards: RewardCard[] = [
-    {id: '1', title: 'Blackwells Butchers', count: 8, total: 10, icon: '🥐', image: blackwellsLogo},
-    {id: '2', title: 'Bluecorn Bakers', count: 7, total: 10, icon: '☕', image: bluecornLogo},
-    {id: '3', title: 'The Green Florist', count: 9, total: 10, icon: '🥪', image: sandwichLogo},
-    {id: '4', title: 'Sweet Treats', count: 9, total: 10, icon: '🍩', image: daisyChainImage},
-    {id: '5', title: 'Hot Meals', count: 6, total: 10, icon: '🍲'},
-    {id: '6', title: 'Breakfast', count: 5, total: 10, icon: '🥞'},
-  ];
+  // Convert loaded rewards to RewardCard format, or use default sample data
+  // Sort by newest first (most recently created/scanned appears first)
+  console.log('[HomeScreen] Props rewards received:', propsRewards.length, 'rewards');
+  if (propsRewards.length > 0) {
+    console.log('[HomeScreen] Reward IDs:', propsRewards.map(r => ({ id: r.id, name: r.name, createdAt: r.createdAt })));
+  }
+  
+  const sortedRewards = propsRewards.length > 0
+    ? [...propsRewards].sort((a, b) => {
+        // Sort by createdAt (newest first), then by id as fallback
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (bTime !== aTime) return bTime - aTime; // Newest first
+        return b.id.localeCompare(a.id); // Fallback: sort by id descending
+      })
+    : [];
+  
+  console.log('[HomeScreen] Sorted rewards:', sortedRewards.length, 'rewards');
+  
+  const rewardCards: RewardCard[] = sortedRewards.length > 0
+    ? sortedRewards.map(reward => ({
+        id: reward.id,
+        title: reward.name,
+        count: reward.count, // Current progress (e.g., 1 of 4)
+        total: reward.total, // Total needed (e.g., 4)
+        icon: reward.icon || '🎁',
+        image: reward.businessLogo ? { uri: reward.businessLogo } : undefined, // Use business logo if available
+        isEarned: reward.isEarned || false,
+        pinCode: reward.pinCode,
+        qrCode: reward.qrCode, // Include QR code for display
+      }))
+    : [
+        // Default sample data if no rewards loaded
+        {id: '1', title: 'Blackwells Butchers', count: 8, total: 10, icon: '🥐', image: blackwellsLogo},
+        {id: '2', title: 'Bluecorn Bakers', count: 7, total: 10, icon: '☕', image: bluecornLogo},
+        {id: '3', title: 'The Green Florist', count: 9, total: 10, icon: '🥪', image: sandwichLogo},
+        {id: '4', title: 'Sweet Treats', count: 9, total: 10, icon: '🍩', image: daisyChainImage},
+        {id: '5', title: 'Hot Meals', count: 6, total: 10, icon: '🍲'},
+        {id: '6', title: 'Breakfast', count: 5, total: 10, icon: '🥞'},
+      ];
+  
+  console.log('[HomeScreen] Final reward cards:', rewardCards.length, 'cards');
 
   const goodieCards: GoodieCard[] = [
     {id: '1', title: 'Find More Rewards', image: ''},
@@ -337,9 +392,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     },
     {
       id: '2',
-      title: 'Join in the\nCanny Chat',
-      subtitle: 'Take a look',
-      icon: '📋',
+      title: 'Ask Carrie\nCarrot 🥕',
+      subtitle: 'AI Support 24/7',
+      icon: '💬',
     },
     {
       id: '3',
@@ -574,8 +629,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>REWARDS</Text>
-            <TouchableOpacity onPress={() => onNavigate('LearnMore')}>
-              <Text style={styles.sectionLink}>Learn more</Text>
+            <TouchableOpacity onPress={() => onNavigate('SeeAllRewards')}>
+              <Text style={styles.sectionLink}>SEE ALL</Text>
             </TouchableOpacity>
           </View>
           
@@ -587,11 +642,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               const progress = ((card.total - card.count) / card.total) * 100;
               // All circles use orange
               const progressColor = Colors.secondary;
+              const isEarned = card.isEarned || false;
+              
+              // Handler for reward card click - show QR code modal
+              const handleRewardPress = () => {
+                setSelectedRewardForQR(card);
+                setRewardQRModalVisible(true);
+              };
+              
               return (
                 <TouchableOpacity
                   key={card.id}
                   style={styles.rewardCard}
-                  onPress={() => onNavigate(`Reward${card.id}`)}>
+                  onPress={handleRewardPress}>
                   <View style={styles.rewardTitleContainer}>
                     <Text style={styles.rewardTitle}>{card.title}</Text>
                   </View>
@@ -662,9 +725,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       ) : (
                         <Text style={styles.rewardIcon}>{card.icon}</Text>
                       )}
+                      {/* Redemption badge overlay when reward is earned */}
+                      {isEarned && (
+                        <TouchableOpacity
+                          style={styles.redeemBadgeOverlay}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleRewardPress();
+                          }}
+                          activeOpacity={0.8}>
+                          <View style={styles.redeemBadge}>
+                            <Text style={styles.redeemBadgeText}>🎁</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
-                  <Text style={styles.rewardCount}>Collect {card.count} more</Text>
+                  <Text style={styles.rewardCount}>
+                    {isEarned ? 'Ready to Redeem!' : `Collect ${card.count} more`}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -891,6 +970,41 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={notificationsModalVisible}
         onClose={() => setNotificationsModalVisible(false)}
         hasUnread={hasUnreadNotifications}
+      />
+      <PinEntryModal
+        visible={pinModalVisible}
+        onClose={() => {
+          setPinModalVisible(false);
+          setSelectedRewardForRedemption(null);
+        }}
+        onVerify={async (enteredPin: string) => {
+          if (selectedRewardForRedemption?.pinCode === enteredPin) {
+            setPinModalVisible(false);
+            setSelectedRewardForRedemption(null);
+            setCongratulationsModalVisible(true);
+            return true;
+          }
+          return false;
+        }}
+        rewardName={selectedRewardForRedemption?.title || 'Reward'}
+      />
+      <CongratulationsModal
+        visible={congratulationsModalVisible}
+        onClose={() => setCongratulationsModalVisible(false)}
+      />
+      
+      {/* Reward QR Code Modal */}
+      <RewardQRCodeModal
+        visible={rewardQRModalVisible}
+        rewardName={selectedRewardForQR?.title || ''}
+        qrValue={selectedRewardForQR?.qrCode || ''}
+        onClose={() => setRewardQRModalVisible(false)}
+        onView={() => {
+          setRewardQRModalVisible(false);
+          if (selectedRewardForQR) {
+            onNavigate(`Reward${selectedRewardForQR.id}`);
+          }
+        }}
       />
     </SafeAreaView>
   );
@@ -1199,6 +1313,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  redeemDotIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF0000',
+    borderWidth: 2,
+    borderColor: Colors.background,
+    zIndex: 10,
+  },
+  redeemBadgeOverlay: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    zIndex: 10,
+  },
+  redeemBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  redeemBadgeText: {
+    fontSize: 18,
   },
   goodieCard: {
     width: RECTANGULAR_CARD_WIDTH,

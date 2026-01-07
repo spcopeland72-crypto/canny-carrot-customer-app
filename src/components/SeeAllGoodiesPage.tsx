@@ -17,6 +17,7 @@ interface SeeAllGoodiesPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onScanPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -53,6 +54,7 @@ const SeeAllGoodiesPage: React.FC<SeeAllGoodiesPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onScanPress,
 }) => {
   return (
     <SafeAreaView style={styles.container}>
@@ -100,7 +102,7 @@ const SeeAllGoodiesPage: React.FC<SeeAllGoodiesPageProps> = ({
       <BottomNavigation
         currentScreen={currentScreen}
         onNavigate={onNavigate}
-        onScanPress={() => {}}
+        onScanPress={onScanPress}
       />
     </SafeAreaView>
   );
