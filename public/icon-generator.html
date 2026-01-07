@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h1>Generating icons...</h1>
+  <canvas id="canvas192" width="192" height="192"></canvas>
+  <canvas id="canvas512" width="512" height="512"></canvas>
+  <script>
+    function generateIcon(canvasId, size, bgColor, text) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      // Background
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, size, size);
+      
+      // Draw carrot emoji or text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${size * 0.5}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, size / 2, size / 2);
+      
+      // Download
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `icon-${size}.png`;
+        a.click();
+      });
+    }
+    
+    generateIcon('canvas192', 192, '#FF6B35', '🥕');
+    generateIcon('canvas512', 512, '#FF6B35', '🥕');
+    
+    document.body.innerHTML += '<p>Icons generated! Check your downloads.</p>';
+  </script>
+</body>
+</html>
+

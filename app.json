@@ -70,7 +70,24 @@
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Canny Carrot",
+      "shortName": "Canny Carrot",
+      "description": "Earn rewards at your favorite local businesses",
+      "themeColor": "#FF6B35",
+      "backgroundColor": "#FF6B35",
+      "display": "standalone",
+      "orientation": "portrait",
+      "scope": "/",
+      "startUrl": "/",
+      "lang": "en",
+      "dir": "ltr",
+      "preferRelatedApplications": false,
+      "splash": {
+        "backgroundColor": "#FF6B35",
+        "resizeMode": "contain",
+        "image": "./assets/icon.png"
+      }
     },
     "plugins": [
       [
