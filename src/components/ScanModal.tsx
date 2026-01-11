@@ -17,8 +17,6 @@ import {Colors} from '../constants/Colors';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
-import {queueOperation} from '../services/syncManager';
-import {getDeviceId} from '../services/localStorage';
 import {recordRewardScan} from '../services/customerRecord';
 
 // Check if browser supports native BarcodeDetector API
@@ -255,6 +253,37 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     }
   }, [visible, permission]);
 
+  // Helper function to stop camera/scanner
+  const stopCameraAndScanner = async () => {
+    try {
+      // Stop html5-qrcode scanner if running
+      if (html5QrCodeRef.current) {
+        const scannerInstance = html5QrCodeRef.current;
+        html5QrCodeRef.current = null; // Clear ref first to prevent double-stop
+        try {
+          await scannerInstance.stop();
+          scannerInstance.clear();
+        } catch (e) {
+          // Ignore errors - scanner may already be stopped
+        }
+      }
+      
+      // Stop video stream if running
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      // Stop scan interval if running
+      if (scanIntervalRef.current !== null) {
+        cancelAnimationFrame(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+    } catch (error) {
+      console.error('[ScanModal] Error stopping camera/scanner:', error);
+    }
+  };
+
   // Process scanned reward QR code
   const processRewardQRCode = async (qrValue: string) => {
     if (!qrValue || typeof qrValue !== 'string') {
@@ -324,9 +353,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const existingRewards = await loadRewards();
       let existingReward = existingRewards.find(r => r.id === parsedReward.id || r.qrCode === normalizedQr);
       
-      // Get device ID for customer identification
-      const customerId = await getDeviceId();
-      
       // Use the new customer record service to track rewards properly
       // Get points per purchase from QR code (default: 1)
       const pointsPerPurchase = parsed.type === 'reward' && parsed.data.pointsPerPurchase 
@@ -385,15 +411,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         );
         await saveRewards(updatedRewards);
         
-        // Queue sync to Redis
-        console.log('[ScanModal] Queueing reward update for sync to Redis');
-        await queueOperation('update', 'customerReward', existingReward.id, {
-          ...existingReward,
-          customerId,
-          businessId: businessId,
-          lastScannedAt: new Date().toISOString(),
-        });
-        
         // Verify the reward was saved
         const verifyRewards = await loadRewards();
         console.log('[ScanModal] Verified saved rewards after update:', verifyRewards.length, 'rewards found');
@@ -402,8 +419,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
         }
         
-        // Show reward point earned message first, then close modal
+        // Stop camera/scanner immediately before showing Alert
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
         
         // Call onRewardEarned callback if reward was newly earned
         if (isNewlyEarned) {
@@ -471,16 +489,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         await saveRewards(updatedRewards);
         console.log('[ScanModal] Reward saved successfully, total rewards:', updatedRewards.length);
         
-        // Queue sync to Redis
-        console.log('[ScanModal] Queueing new reward for sync to Redis');
-        await queueOperation('create', 'customerReward', newReward.id, {
-          ...newReward,
-          customerId,
-          businessId: businessId,
-          createdAt: new Date().toISOString(),
-          lastScannedAt: new Date().toISOString(),
-        });
-        
         // Verify the reward was saved by reloading
         const verifyRewards = await loadRewards();
         console.log('[ScanModal] Verified saved rewards:', verifyRewards.length, 'rewards found');
@@ -491,8 +499,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
         }
         
-        // Show reward point earned message first, then close modal
+        // Stop camera/scanner immediately before showing Alert
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
         
         // Call onRewardEarned callback if reward was newly earned
         if (isNewlyEarned) {
