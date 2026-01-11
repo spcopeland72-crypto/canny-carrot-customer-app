@@ -622,45 +622,54 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           }
         }
         
-        // Use html5-qrcode library first (more reliable than BarcodeDetector)
-        // It handles its own video stream and QR code detection
-        try {
-          const Html5Qrcode = require('html5-qrcode');
-          const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
-          
-          await html5QrCode.start(
-            { facingMode: 'environment' },
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-            },
-            (decodedText: string) => {
-              console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
-              html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-                processRewardQRCode(decodedText);
-              }).catch((err: any) => {
-                console.error('[ScanModal] Error stopping html5-qrcode:', err);
-              });
-            },
-            (errorMessage: string) => {
-              // Ignore scanning errors, just continue scanning
-            }
-          );
-          
-          html5QrCodeRef.current = html5QrCode;
-          setScanError(null);
-          return; // Successfully started html5-qrcode, exit early
-        } catch (html5Error) {
-          console.warn('[ScanModal] html5-qrcode not available, trying BarcodeDetector:', html5Error);
-          // Fallback to BarcodeDetector if html5-qrcode fails
-        }
-        
-        // Fallback: Use BarcodeDetector API with manual video stream
-        // Ensure stream was obtained
+        // Ensure stream was obtained first
         if (!stream) {
           throw new Error('Failed to obtain camera stream.');
         }
+        
+        // Try html5-qrcode library first (more reliable than BarcodeDetector)
+        // It handles its own video stream and QR code detection
+        let html5QrCodeAvailable = false;
+        try {
+          // Check if html5-qrcode can be loaded
+          const Html5Qrcode = require('html5-qrcode');
+          if (Html5Qrcode) {
+            html5QrCodeAvailable = true;
+            // Stop the existing stream since html5-qrcode will create its own
+            stream.getTracks().forEach(track => track.stop());
+            
+            const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
+            
+            await html5QrCode.start(
+              { facingMode: 'environment' },
+              {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+              },
+              (decodedText: string) => {
+                console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
+                html5QrCode.stop().then(() => {
+                  html5QrCode.clear();
+                  processRewardQRCode(decodedText);
+                }).catch((err: any) => {
+                  console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                });
+              },
+              (errorMessage: string) => {
+                // Ignore scanning errors, just continue scanning
+              }
+            );
+            
+            html5QrCodeRef.current = html5QrCode;
+            setScanError(null);
+            return; // Successfully started html5-qrcode, exit early
+          }
+        } catch (html5Error) {
+          console.warn('[ScanModal] html5-qrcode not available, trying BarcodeDetector:', html5Error);
+          // Continue to BarcodeDetector fallback
+        }
+        
+        // Fallback: Use BarcodeDetector API with manual video stream
         
         streamRef.current = stream;
         
