@@ -196,6 +196,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           videoElement.parentNode.removeChild(videoElement);
         }
         
+        // Clear html5-qrcode-scanner div from DOM
+        const html5ScannerElement = document.getElementById('html5-qrcode-scanner');
+        if (html5ScannerElement && html5ScannerElement.parentNode) {
+          // Clear inner content but keep the div (html5-qrcode needs it)
+          html5ScannerElement.innerHTML = '';
+        }
+        
         setCameraError(null);
         setScanError(null);
         setCameraReady(false);
