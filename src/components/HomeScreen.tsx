@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {getTimeBasedGreeting} from '../utils/timeGreeting';
+import Constants from 'expo-constants';
 import CircularProgress from './CircularProgress';
 import BottomNavigation from './BottomNavigation';
 import FindMoreRewardsModal from './FindMoreRewardsModal';
@@ -441,7 +442,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           
           {/* Time-based greeting */}
           <Text style={styles.greeting}>
-            {greeting}, {userName}
+            {greeting}, {userName} <Text style={styles.versionText}> v{Constants.expoConfig?.version || '1.0.0'}</Text>
           </Text>
           
           {/* Right icons */}
@@ -976,9 +977,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       <ScanModal
         visible={scanModalVisible}
         onClose={() => setScanModalVisible(false)}
-        onRewardScanned={(reward) => {
-          // Reload rewards or update UI as needed
+        onRewardScanned={async (reward) => {
+          // Reload rewards to update UI
           console.log('Reward scanned:', reward);
+          // Trigger navigation away and back to Home to force App.tsx to reload rewards
+          // App.tsx reloads rewards when screen changes to Home
+          if (currentScreen === 'Home') {
+            // Navigate away briefly to trigger reload, then back to Home
+            onNavigate('Search');
+            setTimeout(() => {
+              onNavigate('Home');
+            }, 100);
+          }
         }}
         onRewardEarned={(reward) => {
           // Show congratulations modal when reward is earned
@@ -1121,6 +1131,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  versionText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: Colors.text.secondary,
+    opacity: 0.7,
   },
   headerIcons: {
     flexDirection: 'row',
