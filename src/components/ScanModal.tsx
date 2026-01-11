@@ -402,28 +402,29 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
         }
         
-        // Close camera modal immediately after scan completes
+        // Show reward point earned message first, then close modal
         isProcessingRef.current = false;
-        onClose();
+        
+        // Call onRewardEarned callback if reward was newly earned
+        if (isNewlyEarned) {
+          setTimeout(() => {
+            onRewardEarned?.(existingReward!);
+          }, 100);
+        }
         
         // Show reward point earned message
         Alert.alert(
-          'Reward Point Earned!',
+          'Success, you earned a point!',
           `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
           [{text: 'OK', onPress: () => {
+            // Close modal after user dismisses alert
+            onClose();
             // Call callback to reload rewards and return to home
             setTimeout(() => {
               onRewardScanned?.(existingReward!);
             }, 100);
           }}]
         );
-        
-        // Call onRewardEarned callback if reward was newly earned
-        if (isNewlyEarned) {
-          setTimeout(() => {
-            onRewardEarned?.(existingReward!);
-          }, 200);
-        }
       } else {
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
         const type = parsedReward.products.length > 0 ? 'product' : 'action';
@@ -490,29 +491,29 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
         }
         
-        // Show appropriate message
-        // Close camera modal immediately after scan completes
+        // Show reward point earned message first, then close modal
         isProcessingRef.current = false;
-        onClose();
+        
+        // Call onRewardEarned callback if reward was newly earned
+        if (isNewlyEarned) {
+          setTimeout(() => {
+            onRewardEarned?.(newReward);
+          }, 100);
+        }
         
         // Show reward point earned message
         Alert.alert(
-          'Reward Point Earned!',
+          'Success, you earned a point!',
           `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
           [{text: 'OK', onPress: () => {
+            // Close modal after user dismisses alert
+            onClose();
             // Call callback to reload rewards and return to home
             setTimeout(() => {
               onRewardScanned?.(newReward);
             }, 100);
           }}]
         );
-        
-        // Call onRewardEarned callback if reward was newly earned
-        if (isNewlyEarned) {
-          setTimeout(() => {
-            onRewardEarned?.(newReward);
-          }, 200);
-        }
       }
     } catch (error) {
       console.error('Error processing reward QR code:', error);
