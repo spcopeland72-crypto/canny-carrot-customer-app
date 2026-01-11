@@ -82,7 +82,7 @@ export const generateCampaignQRCode = (
 };
 
 /**
- * Parse QR code - handles REWARD, COMPANY, and CAMPAIGN formats
+ * Parse QR code - handles REWARD, COMPANY, and CAMPAIGN formats (both string and JSON)
  */
 export const parseQRCode = (qrValue: string): ParsedQR => {
   if (!qrValue || typeof qrValue !== 'string') {
@@ -90,6 +90,26 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   const normalizedQr = qrValue.trim();
+  
+  // Try to parse as JSON first (legacy format from business app)
+  try {
+    const parsed = JSON.parse(normalizedQr);
+    if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
+      return {
+        type: 'reward',
+        data: {
+          id: parsed.reward.id || '',
+          name: parsed.reward.name || 'Unnamed Reward',
+          requirement: parsed.reward.requirement || parsed.reward.pointsPerPurchase || 1,
+          rewardType: parsed.reward.rewardType || 'free_product',
+          products: parsed.reward.products || [],
+          pinCode: parsed.reward.pinCode || '',
+        },
+      };
+    }
+  } catch (e) {
+    // Not JSON, continue with string format parsing
+  }
   
   // Handle COMPANY QR codes (business QR codes)
   if (normalizedQr.startsWith('COMPANY:')) {
@@ -195,14 +215,26 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
 };
 
 /**
- * Check if QR code is valid (starts with known prefix)
+ * Check if QR code is valid (starts with known prefix or is valid JSON)
  */
 export const isValidQRCode = (qrValue: string): boolean => {
   if (!qrValue || typeof qrValue !== 'string') {
     return false;
   }
   const normalized = qrValue.trim();
-  return normalized.startsWith('REWARD:') || 
-         normalized.startsWith('COMPANY:') || 
-         normalized.startsWith('CAMPAIGN:');
+  
+  // Check string format prefixes
+  if (normalized.startsWith('REWARD:') || 
+      normalized.startsWith('COMPANY:') || 
+      normalized.startsWith('CAMPAIGN:')) {
+    return true;
+  }
+  
+  // Check JSON format (legacy)
+  try {
+    const parsed = JSON.parse(normalized);
+    return parsed.type === 'reward' && parsed.reward && parsed.reward.id;
+  } catch (e) {
+    return false;
+  }
 };
