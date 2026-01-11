@@ -11,8 +11,11 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
-import {loadRewards, type CustomerReward} from '../utils/dataStorage';
+import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
 import RewardQRCodeModal from './RewardQRCodeModal';
+import RedeemModal from './RedeemModal';
+import CongratulationsModal from './CongratulationsModal';
+import {redeemReward} from '../services/customerRecord';
 
 interface SeeAllRewardsPageProps {
   currentScreen: string;
@@ -27,7 +30,10 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
 }) => {
   const [rewards, setRewards] = useState<CustomerReward[]>([]);
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
+  const [redeemModalVisible, setRedeemModalVisible] = useState(false);
+  const [congratulationsModalVisible, setCongratulationsModalVisible] = useState(false);
   const [selectedReward, setSelectedReward] = useState<CustomerReward | null>(null);
+  const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<CustomerReward | null>(null);
 
   useEffect(() => {
     const loadRewardsData = async () => {
@@ -117,8 +123,22 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
   const displayRewards = rewards.length > 0 ? rewards : defaultRewards;
 
   const handleRewardPress = (reward: CustomerReward) => {
-    setSelectedReward(reward);
-    setRewardQRModalVisible(true);
+    if (reward.isEarned) {
+      // Reward is earned - open Redeem modal for redemption
+      setSelectedRewardForRedemption(reward);
+      setRedeemModalVisible(true);
+    } else {
+      // Reward not yet earned - show QR code
+      setSelectedReward(reward);
+      setRewardQRModalVisible(true);
+    }
+  };
+
+  const handleRedeemDotPress = (reward: CustomerReward, e: any) => {
+    e.stopPropagation();
+    // Badge click opens Redeem modal for redemption
+    setSelectedRewardForRedemption(reward);
+    setRedeemModalVisible(true);
   };
 
   return (
@@ -144,8 +164,15 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
               ) : (
                 <Text style={styles.rewardIconEmoji}>{reward.icon || '🎁'}</Text>
               )}
-              {/* Red dot indicator if earned */}
-              {reward.isEarned && <View style={styles.redeemDot} />}
+              {/* Red dot indicator if earned - clickable */}
+              {reward.isEarned && (
+                <TouchableOpacity
+                  style={styles.redeemDotContainer}
+                  onPress={(e) => handleRedeemDotPress(reward, e)}
+                  activeOpacity={0.8}>
+                  <View style={styles.redeemDot} />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Reward Info */}
@@ -179,6 +206,69 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
                 onNavigate(`Reward${selectedReward.id}`);
               }
             }}
+          />
+          
+          {/* Redeem Modal */}
+          <RedeemModal
+            visible={redeemModalVisible}
+            onClose={() => {
+              setRedeemModalVisible(false);
+              setSelectedRewardForRedemption(null);
+            }}
+            onRedeem={async (enteredPin: string) => {
+              try {
+                // PIN is already verified in RedeemModal component
+                // Redeem the reward in customer record (moves to redeemedRewards)
+                const redeemed = await redeemReward(selectedRewardForRedemption!.id);
+                
+                if (redeemed) {
+                  // Reset the reward in AsyncStorage to start cycle again (count = 0)
+                  const allRewards = await loadRewards();
+                  const rewardIndex = allRewards.findIndex(r => r.id === selectedRewardForRedemption!.id);
+                  
+                  if (rewardIndex >= 0) {
+                    // Reset count to 0, remove isEarned flag, keep other data
+                    allRewards[rewardIndex] = {
+                      ...allRewards[rewardIndex],
+                      count: 0,
+                      isEarned: false,
+                      pointsEarned: 0,
+                    };
+                    await saveRewards(allRewards);
+                    console.log(`✅ Reward ${selectedRewardForRedemption!.id} redeemed and reset to 0 points`);
+                    
+                    // Reload rewards to update UI
+                    setRewards(allRewards);
+                  }
+                  
+                  // Show congratulations modal
+                  setRedeemModalVisible(false);
+                  setCongratulationsModalVisible(true);
+                  
+                  return true;
+                } else {
+                  console.error('Failed to redeem reward');
+                  return false;
+                }
+              } catch (error) {
+                console.error('Error redeeming reward:', error);
+                return false;
+              }
+            }}
+            rewardName={selectedRewardForRedemption?.name || 'Reward'}
+            qrCode={selectedRewardForRedemption?.qrCode}
+            pinCode={selectedRewardForRedemption?.pinCode}
+          />
+          
+          {/* Congratulations Modal */}
+          <CongratulationsModal
+            visible={congratulationsModalVisible}
+            onClose={() => {
+              setCongratulationsModalVisible(false);
+              setSelectedRewardForRedemption(null);
+            }}
+            message="Congratulations you have redeemed your reward"
+            rewardName={selectedRewardForRedemption?.name}
           />
         </PageTemplate>
       );
@@ -215,10 +305,18 @@ const styles = StyleSheet.create({
   rewardIconEmoji: {
     fontSize: 30,
   },
-  redeemDot: {
+  redeemDotContainer: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  redeemDot: {
     width: 12,
     height: 12,
     borderRadius: 6,

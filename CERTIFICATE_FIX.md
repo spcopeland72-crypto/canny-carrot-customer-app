@@ -62,3 +62,6 @@ Expo uses a self-signed certificate for HTTPS, which browsers don't trust by def
 **For local development**: Use HTTP on localhost (`http://localhost:8084`)  
 **For network testing**: Use HTTP and access via localhost, or accept the certificate warning for HTTPS
 
+
+
+

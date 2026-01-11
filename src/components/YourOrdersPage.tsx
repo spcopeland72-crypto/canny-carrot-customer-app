@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
   Switch,
+  Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -41,11 +42,40 @@ const YourOrdersPage: React.FC<YourOrdersPageProps> = ({
     marketing: true,
   });
 
-  const handleSubmit = () => {
-    console.log('Account settings submitted:', accountSettings);
-    // Handle form submission
-    if (onBack) {
-      onBack();
+  const handleSubmit = async () => {
+    try {
+      // IMMEDIATELY save account settings to local customer repository
+      const { updateCustomerProfile } = await import('../services/customerRecord');
+      
+      // Update email if changed
+      const updates: any = {};
+      if (accountSettings.email) {
+        updates.email = accountSettings.email;
+      }
+      
+      // Update preferences
+      updates.preferences = {
+        notifications: accountSettings.notifications,
+        emailMarketing: accountSettings.emailNotifications || accountSettings.marketing,
+        smsMarketing: accountSettings.smsNotifications,
+      };
+      
+      await updateCustomerProfile(updates);
+      
+      console.log('✅ [YourOrdersPage] Account settings saved to local repository');
+      
+      // Note: Password changes would need separate API call to update auth
+      // For now, just save profile changes
+      
+      Alert.alert('Success', 'Account settings saved successfully');
+      
+      // Navigate back
+      if (onBack) {
+        onBack();
+      }
+    } catch (error) {
+      console.error('[YourOrdersPage] Error saving account settings:', error);
+      Alert.alert('Error', 'Failed to save account settings. Please try again.');
     }
   };
 

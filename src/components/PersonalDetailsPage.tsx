@@ -8,6 +8,7 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
@@ -35,22 +36,31 @@ const PersonalDetailsPage: React.FC<PersonalDetailsPageProps> = ({
   const [city, setCity] = useState('');
   const [postcode, setPostcode] = useState('');
 
-  const handleSubmit = () => {
-    // Handle form submission
-    console.log('Form submitted:', {
-      firstName,
-      lastName,
-      email,
-      phone,
-      dateOfBirth,
-      addressLine1,
-      addressLine2,
-      city,
-      postcode,
-    });
-    // Could navigate back or show success message
-    if (onBack) {
-      onBack();
+  const handleSubmit = async () => {
+    try {
+      // IMMEDIATELY save to local customer repository
+      const { updateCustomerProfile } = await import('../services/customerRecord');
+      
+      // Build full name from first and last name
+      const fullName = [firstName, lastName].filter(Boolean).join(' ') || undefined;
+      
+      await updateCustomerProfile({
+        name: fullName,
+        email: email || undefined,
+        phone: phone || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        postcode: postcode || undefined,
+      });
+      
+      console.log('✅ [PersonalDetails] Customer profile saved to local repository');
+      
+      // Navigate back or show success message
+      if (onBack) {
+        onBack();
+      }
+    } catch (error) {
+      console.error('[PersonalDetails] Error saving profile:', error);
+      Alert.alert('Error', 'Failed to save personal details. Please try again.');
     }
   };
 

@@ -13,6 +13,8 @@ import {Colors} from '../constants/Colors';
 interface CongratulationsModalProps {
   visible: boolean;
   onClose: () => void;
+  message?: string; // Optional custom message
+  rewardName?: string; // Optional reward name for context
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
@@ -29,6 +31,8 @@ try {
 const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
   visible,
   onClose,
+  message,
+  rewardName,
 }) => {
   return (
     <Modal
@@ -56,6 +60,14 @@ const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
             )}
             
             <Text style={styles.congratulationsText}>Congratulations!</Text>
+            {message && (
+              <Text style={styles.messageText}>{message}</Text>
+            )}
+            {!message && rewardName && (
+              <Text style={styles.messageText}>
+                Congrats you have earned a reward touch this icon for your redemption code
+              </Text>
+            )}
 
             <TouchableOpacity style={styles.closeButton2} onPress={onClose}>
               <Text style={styles.closeButtonText2}>Close</Text>
@@ -123,8 +135,16 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: Colors.secondary, // Orange color
-    marginBottom: 32,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  messageText: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+    paddingHorizontal: 8,
   },
   closeButton2: {
     width: '100%',
@@ -141,5 +161,8 @@ const styles = StyleSheet.create({
 });
 
 export default CongratulationsModal;
+
+
+
 
 

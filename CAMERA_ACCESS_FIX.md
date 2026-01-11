@@ -70,3 +70,6 @@ If you don't want to deal with HTTPS certificates, you can:
 2. Use port forwarding or SSH tunnel to access from other devices
 3. Use the Android Metro build (which uses native camera, not web API)
 
+
+
+

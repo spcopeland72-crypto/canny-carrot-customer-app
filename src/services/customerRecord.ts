@@ -250,6 +250,8 @@ export const recordCampaignScan = async (
 
 /**
  * Redeem an earned reward
+ * Moves reward from earnedRewards to redeemedRewards (retained in history)
+ * Creates a new active reward entry to start earning again
  */
 export const redeemReward = async (rewardId: string): Promise<CustomerRewardProgress | null> => {
   const now = new Date().toISOString();
@@ -262,14 +264,33 @@ export const redeemReward = async (rewardId: string): Promise<CustomerRewardProg
     return null;
   }
   
-  // Move from earned to redeemed
+  // Move from earned to redeemed (retained in customer repo history)
   const reward = record.earnedRewards[rewardIndex];
   record.earnedRewards.splice(rewardIndex, 1);
   
   reward.status = 'redeemed';
   reward.redeemedAt = now;
-  record.redeemedRewards.push(reward);
+  record.redeemedRewards.push(reward); // Retained in redeemedRewards for history
   record.stats.totalRewardsRedeemed++;
+  
+  // Create a new active reward entry to start earning cycle again
+  // This allows the customer to earn the same reward again while keeping redemption history
+  const newActiveReward: CustomerRewardProgress = {
+    rewardId: reward.rewardId,
+    businessId: reward.businessId || '',
+    businessName: reward.businessName,
+    rewardName: reward.rewardName,
+    pointsEarned: 0, // Start fresh at 0 points
+    pointsRequired: reward.pointsRequired, // Keep same requirement
+    status: 'active',
+    firstScanAt: '', // Will be set on first scan
+    lastScanAt: '', // Will be set on first scan
+    scanHistory: [],
+    rewardType: reward.rewardType,
+    qrCode: reward.qrCode, // Keep QR code for scanning
+  };
+  
+  record.activeRewards.push(newActiveReward);
   
   await saveCustomerRecord(record);
   
@@ -281,7 +302,9 @@ export const redeemReward = async (rewardId: string): Promise<CustomerRewardProg
     redeemedAt: now,
   });
   
-  return reward;
+  console.log(`✅ Reward ${rewardId} redeemed and new active reward created (points reset to 0)`);
+  
+  return reward; // Return the redeemed reward (now in redeemedRewards)
 };
 
 /**

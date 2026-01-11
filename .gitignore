@@ -65,10 +65,4 @@ yarn-error.log
 # testing
 /coverage
 
-# Expo / React Native
-.expo/
-dist/
-web-build/
-
-
 

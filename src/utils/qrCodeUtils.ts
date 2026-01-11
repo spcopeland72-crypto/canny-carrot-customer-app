@@ -111,6 +111,11 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   try {
     const parsed = JSON.parse(normalizedQr);
     if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
+      console.log('[qrCodeUtils] Successfully parsed JSON reward QR code:', {
+        id: parsed.reward.id,
+        name: parsed.reward.name,
+        requirement: parsed.reward.requirement,
+      });
       return {
         type: 'reward',
         data: {
@@ -132,9 +137,12 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
           } : undefined,
         },
       };
+    } else {
+      console.warn('[qrCodeUtils] JSON parsed but invalid structure:', parsed);
     }
   } catch (e) {
     // Not JSON, continue with legacy format parsing
+    console.log('[qrCodeUtils] Not JSON format, trying legacy formats');
   }
   
   // Handle COMPANY QR codes (business QR codes)

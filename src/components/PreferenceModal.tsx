@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 
@@ -28,14 +29,27 @@ const PreferenceModal: React.FC<PreferenceModalProps> = ({
   const [marketingPreference, setMarketingPreference] = useState<string>('opt-in');
   const [messagingPreference, setMessagingPreference] = useState<string>('opt-in');
 
-  const handleSubmit = () => {
-    console.log('Preferences submitted:', {
-      title,
-      marketingPreference,
-      messagingPreference,
-    });
-    // Close modal after submission
-    onClose();
+  const handleSubmit = async () => {
+    try {
+      // IMMEDIATELY save preferences to local customer repository
+      const { updateCustomerProfile } = await import('../services/customerRecord');
+      
+      await updateCustomerProfile({
+        preferences: {
+          notifications: messagingPreference === 'opt-in',
+          emailMarketing: marketingPreference === 'opt-in',
+          smsMarketing: messagingPreference === 'opt-in',
+        },
+      });
+      
+      console.log('✅ [PreferenceModal] Customer preferences saved to local repository');
+      
+      // Close modal after submission
+      onClose();
+    } catch (error) {
+      console.error('[PreferenceModal] Error saving preferences:', error);
+      Alert.alert('Error', 'Failed to save preferences. Please try again.');
+    }
   };
 
   return (

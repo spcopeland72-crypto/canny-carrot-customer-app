@@ -32,6 +32,7 @@ interface ScanModalProps {
   visible: boolean;
   onClose: () => void;
   onRewardScanned?: (reward: CustomerReward) => void;
+  onRewardEarned?: (reward: CustomerReward) => void; // Callback when reward is newly earned
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -86,7 +87,7 @@ const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
   return null;
 };
 
-const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}) => {
+const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned, onRewardEarned}) => {
   // Safe area top padding for iOS (status bar + notch)
   const safeAreaTop = Platform.OS === 'ios' ? 44 : 12;
   const [scanError, setScanError] = useState<string | null>(null);
@@ -177,27 +178,34 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
   // Small delay before showing camera to ensure permission state is stable
   // Also ensure camera module is loaded (important for standalone builds)
   useEffect(() => {
-    if (visible && Platform.OS !== 'web' && permission?.granted) {
-      console.log('[ScanModal] Permission granted, preparing camera...');
-      try {
-        // Longer delay for standalone builds to ensure native module is ready
-        const timer = setTimeout(() => {
-          console.log('[ScanModal] Setting camera ready...');
-          setCameraReady(true);
-        }, 500); // Increased to 500ms for more stability
-        return () => {
-          console.log('[ScanModal] Cleaning up camera ready timer');
-          clearTimeout(timer);
-        };
-      } catch (error) {
-        console.error('[ScanModal] Error setting camera ready:', error);
-        console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
-        setCameraError('Failed to initialize camera');
+    // On web, we don't use useCameraPermissions - we request directly via getUserMedia
+    if (visible && Platform.OS !== 'web') {
+      if (permission?.granted) {
+        console.log('[ScanModal] Permission granted, preparing camera...');
+        try {
+          // Longer delay for standalone builds to ensure native module is ready
+          const timer = setTimeout(() => {
+            console.log('[ScanModal] Setting camera ready...');
+            setCameraReady(true);
+          }, 500); // Increased to 500ms for more stability
+          return () => {
+            console.log('[ScanModal] Cleaning up camera ready timer');
+            clearTimeout(timer);
+          };
+        } catch (error) {
+          console.error('[ScanModal] Error setting camera ready:', error);
+          console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
+          setCameraError('Failed to initialize camera');
+          setCameraReady(false);
+        }
+      } else {
+        console.log('[ScanModal] Camera not ready:', { visible, platform: Platform.OS, granted: permission?.granted });
         setCameraReady(false);
       }
-    } else {
-      console.log('[ScanModal] Camera not ready:', { visible, platform: Platform.OS, granted: permission?.granted });
-      setCameraReady(false);
+    } else if (visible && Platform.OS === 'web') {
+      // On web, camera ready state is managed by the startScanner function
+      // Don't set cameraReady here - it will be set when the web scanner starts successfully
+      console.log('[ScanModal] Web platform - camera will be initialized by scanner');
     }
   }, [visible, permission]);
 
@@ -350,18 +358,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
         
         // Show appropriate message based on whether reward was newly earned
         if (isNewlyEarned) {
-          Alert.alert(
-            '🎉 Reward Earned!',
-            `Congratulations! You've earned "${parsedReward.name}"!\n\nVisit the business to redeem your reward.`,
-            [{text: 'OK', onPress: () => {
-              isProcessingRef.current = false;
-              // Call callback after a small delay to ensure state is updated
-              setTimeout(() => {
-                onRewardScanned?.(existingReward!);
-              }, 100);
-              onClose();
-            }}]
-          );
+          // Call onRewardEarned callback to show congratulations modal in parent
+          onRewardEarned?.(existingReward!);
+          isProcessingRef.current = false;
+          // Call callback after a small delay to ensure state is updated
+          setTimeout(() => {
+            onRewardScanned?.(existingReward!);
+          }, 100);
+          onClose();
         } else {
           // Calculate current progress: pointsEarned / requirement (not pointsRequired)
           const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
@@ -446,18 +450,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
         
         // Show appropriate message
         if (isNewlyEarned) {
-          Alert.alert(
-            '🎉 Reward Earned!',
-            `Congratulations! You've earned "${parsedReward.name}" on your first scan!\n\nVisit the business to redeem your reward.`,
-            [{text: 'OK', onPress: () => {
-              isProcessingRef.current = false;
-              // Call callback after a small delay to ensure state is updated
-              setTimeout(() => {
-                onRewardScanned?.(newReward);
-              }, 100);
-              onClose();
-            }}]
-          );
+          // Call onRewardEarned callback to show congratulations modal in parent
+          onRewardEarned?.(newReward);
+          isProcessingRef.current = false;
+          // Call callback after a small delay to ensure state is updated
+          setTimeout(() => {
+            onRewardScanned?.(newReward);
+          }, 100);
+          onClose();
         } else {
           const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
           Alert.alert(
@@ -622,6 +622,41 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
           }
         }
         
+        // Use html5-qrcode library first (more reliable than BarcodeDetector)
+        // It handles its own video stream and QR code detection
+        try {
+          const Html5Qrcode = require('html5-qrcode');
+          const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
+          
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+            },
+            (decodedText: string) => {
+              console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
+              html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                processRewardQRCode(decodedText);
+              }).catch((err: any) => {
+                console.error('[ScanModal] Error stopping html5-qrcode:', err);
+              });
+            },
+            (errorMessage: string) => {
+              // Ignore scanning errors, just continue scanning
+            }
+          );
+          
+          html5QrCodeRef.current = html5QrCode;
+          setScanError(null);
+          return; // Successfully started html5-qrcode, exit early
+        } catch (html5Error) {
+          console.warn('[ScanModal] html5-qrcode not available, trying BarcodeDetector:', html5Error);
+          // Fallback to BarcodeDetector if html5-qrcode fails
+        }
+        
+        // Fallback: Use BarcodeDetector API with manual video stream
         // Ensure stream was obtained
         if (!stream) {
           throw new Error('Failed to obtain camera stream.');
@@ -696,18 +731,90 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
               scanIntervalRef.current = requestAnimationFrame(scanFrame);
             };
             
-            videoElement.addEventListener('loadedmetadata', () => {
+            // Start scanning immediately and also on metadata load
+            if (videoElement.readyState >= videoElement.HAVE_METADATA) {
               scanFrame();
-            });
+            } else {
+              videoElement.addEventListener('loadedmetadata', () => {
+                scanFrame();
+              }, { once: true });
+            }
           } catch (barcodeError) {
-            console.warn('BarcodeDetector not available, camera will still work:', barcodeError);
-            // Camera is working, QR detection just won't work - don't show error
-            setScanError(null);
+            console.warn('BarcodeDetector initialization failed, trying html5-qrcode fallback:', barcodeError);
+            // Fallback: Use html5-qrcode library
+            try {
+              const Html5Qrcode = require('html5-qrcode');
+              const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
+              
+              html5QrCode.start(
+                { facingMode: 'environment' },
+                {
+                  fps: 10,
+                  qrbox: { width: 250, height: 250 },
+                },
+                (decodedText: string) => {
+                  console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
+                  html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    stream.getTracks().forEach(track => track.stop());
+                    processRewardQRCode(decodedText);
+                  }).catch((err: any) => {
+                    console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                  });
+                },
+                (errorMessage: string) => {
+                  // Ignore scanning errors, just continue scanning
+                }
+              ).catch((err: any) => {
+                console.error('[ScanModal] html5-qrcode start failed:', err);
+                setScanError('Failed to start QR code scanner. Please check camera permissions.');
+              });
+              
+              html5QrCodeRef.current = html5QrCode;
+              setScanError(null);
+            } catch (html5Error) {
+              console.error('[ScanModal] html5-qrcode not available:', html5Error);
+              setScanError('QR code scanning is not available. Please use a modern browser.');
+            }
           }
         } else {
-          // Browser doesn't support BarcodeDetector - camera still works, just no auto-detection
-          // Don't show error message, camera is working fine
-          setScanError(null);
+          // Browser doesn't support BarcodeDetector - try html5-qrcode fallback
+          try {
+            const Html5Qrcode = require('html5-qrcode');
+            const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
+            
+            html5QrCode.start(
+              { facingMode: 'environment' },
+              {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+              },
+              (decodedText: string) => {
+                console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
+                html5QrCode.stop().then(() => {
+                  html5QrCode.clear();
+                  if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                  }
+                  processRewardQRCode(decodedText);
+                }).catch((err: any) => {
+                  console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                });
+              },
+              (errorMessage: string) => {
+                // Ignore scanning errors, just continue scanning
+              }
+            ).catch((err: any) => {
+              console.error('[ScanModal] html5-qrcode start failed:', err);
+              setScanError('Failed to start QR code scanner. Please check camera permissions.');
+            });
+            
+            html5QrCodeRef.current = html5QrCode;
+            setScanError(null);
+          } catch (html5Error) {
+            console.error('[ScanModal] html5-qrcode not available:', html5Error);
+            setScanError('QR code scanning is not available. Please use a modern browser.');
+          }
         }
         
       } catch (error: any) {
@@ -773,11 +880,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned}
                   </View>
                 ) : (
                   <View style={styles.videoWrapper}>
-                    <View 
-                      nativeID="html5-qrcode-scanner"
-                      style={styles.videoContainer}
-                />
-              </View>
+                    <div 
+                      id="html5-qrcode-scanner"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  </View>
             )}
               </View>
             ) : (
