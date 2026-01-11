@@ -268,6 +268,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
       }
       
+      // Clear html5-qrcode-scanner div from DOM
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const scannerDiv = document.getElementById('html5-qrcode-scanner');
+        if (scannerDiv) {
+          scannerDiv.innerHTML = '';
+        }
+      }
+      
       // Stop video stream if running
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -291,14 +299,31 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       return;
     }
     
+    // Prevent duplicate processing
+    if (isProcessingRef.current) {
+      console.log('[ScanModal] Already processing QR code, ignoring duplicate scan');
+      return;
+    }
+    
     // Trim whitespace and normalize
     const normalizedQr = qrValue.trim();
     console.log('[ScanModal] Processing QR code:', normalizedQr);
+    
+    // Check for duplicate scans (same code scanned twice in quick succession)
+    if (lastScannedCodeRef.current === normalizedQr) {
+      console.log('[ScanModal] Duplicate QR code scan detected, ignoring');
+      return;
+    }
+    
+    // Mark as processing and update last scanned code
+    isProcessingRef.current = true;
+    lastScannedCodeRef.current = normalizedQr;
     
     // Validate QR code format
     if (!isValidQRCode(normalizedQr)) {
       console.warn('[ScanModal] Invalid QR code format:', normalizedQr);
       isProcessingRef.current = false;
+      lastScannedCodeRef.current = null;
       Alert.alert(
         'Invalid QR Code', 
         `This does not appear to be a valid QR code.\n\nScanned: ${normalizedQr.substring(0, 50)}${normalizedQr.length > 50 ? '...' : ''}`
@@ -902,6 +927,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
+      }
+      // Clear html5-qrcode-scanner div from DOM
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const scannerDiv = document.getElementById('html5-qrcode-scanner');
+        if (scannerDiv) {
+          scannerDiv.innerHTML = '';
+        }
       }
     };
   }, [visible]);

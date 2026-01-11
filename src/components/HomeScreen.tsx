@@ -248,6 +248,7 @@ interface RewardCard {
   isEarned?: boolean; // Whether reward has been earned (points requirement met)
   pinCode?: string; // PIN code for redemption
   qrCode?: string; // QR code value for display
+  businessName?: string; // Business name
 }
 
 interface GoodieCard {
@@ -371,6 +372,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         isEarned: reward.isEarned || false,
         pinCode: reward.pinCode,
         qrCode: reward.qrCode, // Include QR code for display
+        businessName: reward.businessName, // Business name
       }))
     : [
         // Default sample data if no rewards loaded
@@ -674,9 +676,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   key={card.id}
                   style={styles.rewardCard}
                   onPress={handleRewardPress}>
-                  <View style={styles.rewardTitleContainer}>
-                    <Text style={styles.rewardTitle}>{card.title}</Text>
-                  </View>
+                  {/* Business name at top */}
+                  {card.businessName && (
+                    <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
+                  )}
+                  {/* Reward name below business name */}
+                  <Text style={styles.rewardTitle}>{card.title}</Text>
                   <View style={styles.rewardProgressContainer}>
                     {/* Online-black.png image at top left corner of circle 3 */}
                     {card.id === '3' && onlineBlackImage && !onlineImageError ? (
@@ -762,8 +767,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       )}
                     </View>
                   </View>
+                  {/* Points count below icon - e.g., "4 out of 5" */}
                   <Text style={styles.rewardCount}>
-                    {isEarned ? 'Ready to Redeem!' : `Collect ${card.count} more`}
+                    {card.count} out of {card.total}
                   </Text>
                 </TouchableOpacity>
               );
@@ -985,15 +991,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         onRewardScanned={async (reward) => {
           // Reload rewards to update UI
           console.log('Reward scanned:', reward);
-          // Trigger navigation away and back to Home to force App.tsx to reload rewards
-          // App.tsx reloads rewards when screen changes to Home
-          if (currentScreen === 'Home') {
-            // Navigate away briefly to trigger reload, then back to Home
-            onNavigate('Search');
-            setTimeout(() => {
-              onNavigate('Home');
-            }, 100);
-          }
+          // Force reload by navigating away and back to Home
+          // This triggers App.tsx to reload rewards from storage
+          onNavigate('Search');
+          setTimeout(() => {
+            onNavigate('Home');
+          }, 100);
         }}
         onRewardEarned={(reward) => {
           // Show congratulations modal when reward is earned
@@ -1361,17 +1364,19 @@ const styles = StyleSheet.create({
     marginRight: 12,
     // Make it touchable
   },
-  rewardTitleContainer: {
-    height: 48, // Fixed height container to align all circles
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+  rewardBusinessName: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 2,
   },
   rewardTitle: {
     fontSize: 12,
     fontWeight: '600',
     color: Colors.text.primary,
     textAlign: 'center',
+    marginBottom: 8,
   },
   rewardProgressContainer: {
     position: 'relative',
