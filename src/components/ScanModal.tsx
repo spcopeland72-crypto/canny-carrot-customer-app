@@ -790,39 +790,47 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           // Browser doesn't support BarcodeDetector - try html5-qrcode fallback
           try {
             const Html5Qrcode = require('html5-qrcode');
-            const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
-            
-            html5QrCode.start(
-              { facingMode: 'environment' },
-              {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-              },
-              (decodedText: string) => {
-                console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
-                html5QrCode.stop().then(() => {
-                  html5QrCode.clear();
-                  if (streamRef.current) {
-                    streamRef.current.getTracks().forEach(track => track.stop());
-                  }
-                  processRewardQRCode(decodedText);
-                }).catch((err: any) => {
-                  console.error('[ScanModal] Error stopping html5-qrcode:', err);
-                });
-              },
-              (errorMessage: string) => {
-                // Ignore scanning errors, just continue scanning
-              }
-            ).catch((err: any) => {
-              console.error('[ScanModal] html5-qrcode start failed:', err);
-              setScanError('Failed to start QR code scanner. Please check camera permissions.');
-            });
-            
-            html5QrCodeRef.current = html5QrCode;
-            setScanError(null);
+            if (Html5Qrcode) {
+              const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
+              
+              html5QrCode.start(
+                { facingMode: 'environment' },
+                {
+                  fps: 10,
+                  qrbox: { width: 250, height: 250 },
+                },
+                (decodedText: string) => {
+                  console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
+                  html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    if (streamRef.current) {
+                      streamRef.current.getTracks().forEach(track => track.stop());
+                    }
+                    processRewardQRCode(decodedText);
+                  }).catch((err: any) => {
+                    console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                  });
+                },
+                (errorMessage: string) => {
+                  // Ignore scanning errors, just continue scanning
+                }
+              ).catch((err: any) => {
+                console.error('[ScanModal] html5-qrcode start failed:', err);
+                if (err.message && (err.message.includes('Permission') || err.message.includes('NotAllowed'))) {
+                  setScanError('Camera permission denied. Please allow camera access in your browser settings and refresh the page.');
+                } else {
+                  setScanError('Failed to start QR code scanner. Please check camera permissions.');
+                }
+              });
+              
+              html5QrCodeRef.current = html5QrCode;
+              setScanError(null);
+            } else {
+              throw new Error('html5-qrcode module not available');
+            }
           } catch (html5Error) {
             console.error('[ScanModal] html5-qrcode not available:', html5Error);
-            setScanError('QR code scanning is not available. Please use a modern browser.');
+            setScanError('QR code scanning requires camera access. Please allow camera permissions and try again.');
           }
         }
         
