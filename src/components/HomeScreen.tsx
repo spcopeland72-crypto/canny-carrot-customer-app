@@ -24,6 +24,7 @@ import PinEntryModal from './PinEntryModal';
 import RedeemModal from './RedeemModal';
 import CongratulationsModal from './CongratulationsModal';
 import RewardQRCodeModal from './RewardQRCodeModal';
+import AccountModal from './AccountModal';
 import {redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
 
@@ -292,6 +293,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [hasUnreadNotifications] = useState(true); // This would come from user context/API
   const [onlineImageError, setOnlineImageError] = useState(false);
   const [onlineBlackImage, setOnlineBlackImage] = useState<any>(null);
@@ -424,7 +426,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       <View style={styles.header}>
         <View style={styles.headerTop}>
           {/* Logo */}
-          <View style={styles.logoContainer}>
+          <TouchableOpacity
+            style={styles.logoContainer}
+            onPress={() => setAccountModalVisible(true)}
+            activeOpacity={0.7}>
             {logoImage && !logoError ? (
               <Image
                 source={logoImage}
@@ -438,7 +443,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ) : (
               <Text style={styles.logoText}>CC</Text>
             )}
-          </View>
+          </TouchableOpacity>
           
           {/* Time-based greeting */}
           <Text style={styles.greeting}>
@@ -1089,6 +1094,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             onNavigate(`Reward${selectedRewardForQR.id}`);
           }
         }}
+      />
+      
+      {/* Account Modal */}
+      <AccountModal
+        visible={accountModalVisible}
+        onClose={() => setAccountModalVisible(false)}
+        onNavigate={onNavigate}
+        customerName={userName}
+        customerEmail=""
       />
     </SafeAreaView>
   );
