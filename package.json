@@ -8,6 +8,7 @@
     "start": "expo start",
     "web": "expo start --web",
     "web:https": "expo start --web --https",
+    "build:web": "expo export:web",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
   },
