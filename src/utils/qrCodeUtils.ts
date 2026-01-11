@@ -14,25 +14,9 @@ export interface ParsedRewardQR {
   id: string;
   name: string;
   requirement: number;
-  pointsPerPurchase?: number; // Points allocated per purchase/action (default: 1)
   rewardType: string;
   products: string[];
-  pinCode?: string; // PIN code for redemption
-  business?: {
-    name: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    website?: string;
-    logo?: string; // Business logo/icon
-    socialMedia?: {
-      facebook?: string;
-      instagram?: string;
-      twitter?: string;
-      tiktok?: string;
-      linkedin?: string;
-    };
-  };
+  pinCode?: string;
 }
 
 export interface ParsedCompanyQR {
@@ -222,14 +206,3 @@ export const isValidQRCode = (qrValue: string): boolean => {
          normalized.startsWith('COMPANY:') || 
          normalized.startsWith('CAMPAIGN:');
 };
-
-
-
-
-
-
-
-
-
-
-
