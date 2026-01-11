@@ -632,8 +632,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         let html5QrCodeAvailable = false;
         try {
           // Check if html5-qrcode can be loaded
-          const Html5Qrcode = require('html5-qrcode');
-          if (Html5Qrcode) {
+          const html5QrcodeModule = require('html5-qrcode');
+          const Html5Qrcode = html5QrcodeModule.default || html5QrcodeModule.Html5Qrcode || html5QrcodeModule;
+          if (Html5Qrcode && typeof Html5Qrcode === 'function') {
             html5QrCodeAvailable = true;
             // Stop the existing stream since html5-qrcode will create its own
             stream.getTracks().forEach(track => track.stop());
@@ -789,8 +790,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         } else {
           // Browser doesn't support BarcodeDetector - try html5-qrcode fallback
           try {
-            const Html5Qrcode = require('html5-qrcode');
-            if (Html5Qrcode) {
+            const html5QrcodeModule = require('html5-qrcode');
+            const Html5Qrcode = html5QrcodeModule.default || html5QrcodeModule.Html5Qrcode || html5QrcodeModule;
+            if (Html5Qrcode && typeof Html5Qrcode === 'function') {
               const html5QrCode = new Html5Qrcode('html5-qrcode-scanner');
               
               html5QrCode.start(
