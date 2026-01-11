@@ -5,7 +5,7 @@
  * for reward codes, campaign codes, and business codes.
  * 
  * Formats:
- * - Reward: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}
+ * - Reward: REWARD:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  * - Company: COMPANY:{number}:{name}
  * - Campaign: CAMPAIGN:{id}:{name}:{description}
  */
@@ -185,8 +185,30 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
       return { type: 'unknown', data: null };
     }
     
-    if (parts.length >= 5) {
-      // Full format: {id}:{name}:{requirement}:{rewardType}:{products}
+    if (parts.length >= 6) {
+      // Full format with PIN: {id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+      const id = parts[0] || 'unknown';
+      const pinCode = parts[parts.length - 1] || '';
+      const productsStr = parts[parts.length - 2] || '';
+      const rewardType = parts[parts.length - 3] || 'free_product';
+      const requirement = parseInt(parts[parts.length - 4], 10) || 1;
+      // Everything between id and requirement is the name
+      const name = parts.slice(1, parts.length - 4).join(':') || 'Unnamed Reward';
+      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
+      
+      return {
+        type: 'reward',
+        data: {
+          id,
+          name,
+          requirement,
+          rewardType,
+          products,
+          pinCode,
+        },
+      };
+    } else if (parts.length >= 5) {
+      // Format without PIN (legacy): {id}:{name}:{requirement}:{rewardType}:{products}
       const id = parts[0] || 'unknown';
       const productsStr = parts[parts.length - 1] || '';
       const rewardType = parts[parts.length - 2] || 'free_product';
@@ -227,25 +249,13 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
 };
 
 /**
- * Check if QR code is valid (JSON format or starts with known prefix)
+ * Check if QR code is valid (starts with known prefix)
  */
 export const isValidQRCode = (qrValue: string): boolean => {
   if (!qrValue || typeof qrValue !== 'string') {
     return false;
   }
   const normalized = qrValue.trim();
-  
-  // Check JSON format (new format from business app)
-  try {
-    const parsed = JSON.parse(normalized);
-    if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
-      return true;
-    }
-  } catch (e) {
-    // Not JSON, check legacy formats
-  }
-  
-  // Check legacy formats
   return normalized.startsWith('REWARD:') || 
          normalized.startsWith('COMPANY:') || 
          normalized.startsWith('CAMPAIGN:');
