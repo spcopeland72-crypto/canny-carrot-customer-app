@@ -395,31 +395,27 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
         }
         
-        // Show appropriate message based on whether reward was newly earned
+        // Close camera modal immediately after scan completes
+        isProcessingRef.current = false;
+        onClose();
+        
+        // Show reward point earned message
+        Alert.alert(
+          'Reward Point Earned!',
+          `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
+          [{text: 'OK', onPress: () => {
+            // Call callback to reload rewards and return to home
+            setTimeout(() => {
+              onRewardScanned?.(existingReward!);
+            }, 100);
+          }}]
+        );
+        
+        // Call onRewardEarned callback if reward was newly earned
         if (isNewlyEarned) {
-          // Call onRewardEarned callback to show congratulations modal in parent
-          onRewardEarned?.(existingReward!);
-          isProcessingRef.current = false;
-          // Call callback after a small delay to ensure state is updated
           setTimeout(() => {
-            onRewardScanned?.(existingReward!);
-          }, 100);
-          onClose();
-        } else {
-          // Calculate current progress: pointsEarned / requirement (not pointsRequired)
-          const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
-          Alert.alert(
-            'Points Added!',
-            `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!\n\nProgress: ${currentProgress} of ${requirement}`,
-            [{text: 'OK', onPress: () => {
-              isProcessingRef.current = false;
-              // Call callback after a small delay to ensure state is updated
-              setTimeout(() => {
-                onRewardScanned?.(existingReward!);
-              }, 100);
-              onClose();
-            }}]
-          );
+            onRewardEarned?.(existingReward!);
+          }, 200);
         }
       } else {
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
@@ -488,29 +484,27 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
         
         // Show appropriate message
+        // Close camera modal immediately after scan completes
+        isProcessingRef.current = false;
+        onClose();
+        
+        // Show reward point earned message
+        Alert.alert(
+          'Reward Point Earned!',
+          `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
+          [{text: 'OK', onPress: () => {
+            // Call callback to reload rewards and return to home
+            setTimeout(() => {
+              onRewardScanned?.(newReward);
+            }, 100);
+          }}]
+        );
+        
+        // Call onRewardEarned callback if reward was newly earned
         if (isNewlyEarned) {
-          // Call onRewardEarned callback to show congratulations modal in parent
-          onRewardEarned?.(newReward);
-          isProcessingRef.current = false;
-          // Call callback after a small delay to ensure state is updated
           setTimeout(() => {
-            onRewardScanned?.(newReward);
-          }, 100);
-          onClose();
-        } else {
-          const currentProgress = Math.floor(rewardProgress.pointsEarned / pointsPerPurchase);
-          Alert.alert(
-            'New Reward Started!',
-            `You've started earning "${parsedReward.name}"!\n\nProgress: ${currentProgress} of ${requirement}`,
-            [{text: 'OK', onPress: () => {
-              isProcessingRef.current = false;
-              // Call callback after a small delay to ensure state is updated
-              setTimeout(() => {
-                onRewardScanned?.(newReward);
-              }, 100);
-              onClose();
-            }}]
-          );
+            onRewardEarned?.(newReward);
+          }, 200);
         }
       }
     } catch (error) {
