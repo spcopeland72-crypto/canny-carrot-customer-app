@@ -98,7 +98,7 @@ export const generateCampaignQRCode = (
 };
 
 /**
- * Parse QR code - handles JSON format (from business app) and legacy REWARD/COMPANY/CAMPAIGN formats
+ * Parse QR code - handles REWARD, COMPANY, and CAMPAIGN formats
  */
 export const parseQRCode = (qrValue: string): ParsedQR => {
   if (!qrValue || typeof qrValue !== 'string') {
@@ -106,44 +106,6 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   const normalizedQr = qrValue.trim();
-  
-  // Try to parse as JSON first (new format from business app)
-  try {
-    const parsed = JSON.parse(normalizedQr);
-    if (parsed.type === 'reward' && parsed.reward && parsed.reward.id) {
-      console.log('[qrCodeUtils] Successfully parsed JSON reward QR code:', {
-        id: parsed.reward.id,
-        name: parsed.reward.name,
-        requirement: parsed.reward.requirement,
-      });
-      return {
-        type: 'reward',
-        data: {
-          id: parsed.reward.id,
-          name: parsed.reward.name || 'Unnamed Reward',
-          requirement: parsed.reward.requirement || 1,
-          pointsPerPurchase: parsed.reward.pointsPerPurchase || 1, // Default to 1 point per transaction
-          rewardType: parsed.reward.rewardType || 'free_product',
-          products: parsed.reward.products || [],
-          pinCode: parsed.reward.pinCode || '',
-          business: parsed.business ? {
-            name: parsed.business.name || '',
-            address: parsed.business.address || '',
-            phone: parsed.business.phone || '',
-            email: parsed.business.email || '',
-            website: parsed.business.website || '',
-            logo: parsed.business.logo || '', // Include business logo
-            socialMedia: parsed.business.socialMedia || {},
-          } : undefined,
-        },
-      };
-    } else {
-      console.warn('[qrCodeUtils] JSON parsed but invalid structure:', parsed);
-    }
-  } catch (e) {
-    // Not JSON, continue with legacy format parsing
-    console.log('[qrCodeUtils] Not JSON format, trying legacy formats');
-  }
   
   // Handle COMPANY QR codes (business QR codes)
   if (normalizedQr.startsWith('COMPANY:')) {
