@@ -775,12 +775,24 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
                 },
                 (decodedText: string) => {
                   console.log('[ScanModal] QR code scanned via html5-qrcode:', decodedText);
-                  html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                    stream.getTracks().forEach(track => track.stop());
-                    processRewardQRCode(decodedText);
+                  // Process the QR code first, then stop scanner
+                  processRewardQRCode(decodedText).then(() => {
+                    // Stop scanner after processing completes
+                    html5QrCode.stop().then(() => {
+                      html5QrCode.clear();
+                      stream.getTracks().forEach(track => track.stop());
+                    }).catch((err: any) => {
+                      console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                    });
                   }).catch((err: any) => {
-                    console.error('[ScanModal] Error stopping html5-qrcode:', err);
+                    console.error('[ScanModal] Error processing QR code:', err);
+                    // Stop scanner even if processing fails
+                    html5QrCode.stop().then(() => {
+                      html5QrCode.clear();
+                      stream.getTracks().forEach(track => track.stop());
+                    }).catch((stopErr: any) => {
+                      console.error('[ScanModal] Error stopping html5-qrcode:', stopErr);
+                    });
                   });
                 },
                 (errorMessage: string) => {
