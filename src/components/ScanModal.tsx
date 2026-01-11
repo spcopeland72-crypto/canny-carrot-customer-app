@@ -158,7 +158,46 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
   useEffect(() => {
     if (!visible) {
       try {
+        // Stop html5-qrcode scanner if running
+        if (html5QrCodeRef.current) {
+          try {
+            html5QrCodeRef.current.stop().then(() => {
+              html5QrCodeRef.current.clear();
+            }).catch(() => {
+              // Ignore errors during cleanup
+            });
+          } catch (e) {
+            // Ignore errors during cleanup
+          }
+          html5QrCodeRef.current = null;
+        }
+        
+        // Stop video stream if running
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        
+        // Stop scan interval if running
+        if (scanIntervalRef.current !== null) {
+          cancelAnimationFrame(scanIntervalRef.current);
+          scanIntervalRef.current = null;
+        }
+        
+        // Clear video element
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+          videoRef.current = null;
+        }
+        
+        // Clear video element from DOM
+        const videoElement = document.getElementById('qr-scanner-video');
+        if (videoElement && videoElement.parentNode) {
+          videoElement.parentNode.removeChild(videoElement);
+        }
+        
         setCameraError(null);
+        setScanError(null);
         setCameraReady(false);
         setCameraKey(0);
         setLastScannedCode(null); // Reset scanned code when modal closes

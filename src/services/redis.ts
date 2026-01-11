@@ -33,17 +33,6 @@ const getApiBaseUrl = (): string => {
 const API_BASE_URL = getApiBaseUrl();
 const REDIS_API_URL = `${API_BASE_URL}/api/v1/redis`; // API proxy endpoint
 
-// Check connection status via API health endpoint
-const checkApiHealth = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    const data = await response.json();
-    return data.redis === 'connected';
-  } catch {
-    return false;
-  }
-};
-
 let redisClient: any = null;
 let isConnected = false;
 let connectionAttempts = 0;
@@ -57,8 +46,8 @@ const initRedisClient = async (): Promise<any> => {
 };
 
 export const isRedisAvailable = async (): Promise<boolean> => {
-  // Check API health to determine Redis availability
-  return await checkApiHealth();
+  // Assume Redis is available via API
+  return true;
 };
 
 export const isOnline = (): boolean => {
