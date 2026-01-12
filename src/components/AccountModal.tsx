@@ -8,11 +8,14 @@ import {
   ScrollView,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
+import {performCustomerFullSync} from '../services/customerLogout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AccountModalProps {
   visible: boolean;
   onClose: () => void;
   onNavigate: (screen: string) => void;
+  onLogout?: () => void;
   customerName?: string;
   customerEmail?: string;
 }
@@ -21,14 +24,42 @@ const AccountModal: React.FC<AccountModalProps> = ({
   visible,
   onClose,
   onNavigate,
+  onLogout,
   customerName = 'Customer',
   customerEmail = '',
 }) => {
+  const handleLogout = async () => {
+    try {
+      onClose();
+      console.log('🔄 [CUSTOMER LOGOUT] Starting logout with full sync...');
+      
+      // Perform full replacement sync
+      const syncResult = await performCustomerFullSync();
+      
+      if (syncResult.success) {
+        console.log('✅ [CUSTOMER LOGOUT] Full replacement sync completed successfully');
+      } else {
+        console.warn('⚠️ [CUSTOMER LOGOUT] Some data failed to sync:', syncResult.errors);
+        // Continue with logout even if sync fails
+      }
+      
+      // Clear local storage (customer record will be recreated on next login)
+      await AsyncStorage.removeItem('customerRecord');
+      console.log('✅ [CUSTOMER LOGOUT] Logged out successfully');
+      
+      // Call parent logout handler
+      if (onLogout) {
+        onLogout();
+      }
+    } catch (error) {
+      console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
+    }
+  };
+
   const handleMenuAction = (action: string) => {
     onClose();
     if (action === 'logout') {
-      // TODO: Implement logout
-      console.log('Logout clicked');
+      handleLogout();
     } else {
       onNavigate(action);
     }
