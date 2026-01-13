@@ -1090,13 +1090,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={rewardQRModalVisible}
         rewardName={selectedRewardForQR?.title || ''}
         qrValue={selectedRewardForQR?.qrCode || ''}
+        count={selectedRewardForQR?.count || 0}
+        total={selectedRewardForQR?.total || 0}
+        businessName={selectedRewardForQR?.businessName}
         onClose={() => setRewardQRModalVisible(false)}
-        onView={() => {
-          setRewardQRModalVisible(false);
-          if (selectedRewardForQR) {
-            onNavigate(`Reward${selectedRewardForQR.id}`);
-          }
-        }}
+        onNavigate={onNavigate}
       />
       
       {/* Account Modal */}

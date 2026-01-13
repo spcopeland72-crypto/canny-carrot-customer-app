@@ -5,93 +5,19 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Platform,
+  Image,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 
-// QR Code Component - uses qrcode library for web, react-native-qrcode-svg for native
-let QRCodeComponent: any = null;
-
-if (Platform.OS === 'web') {
-  // Web QR code display using qrcode library
-  QRCodeComponent = ({value, size}: {value: string; size: number}) => {
-    const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
-    
-    React.useEffect(() => {
-      const generateQR = async () => {
-        try {
-          // Use qrcode library for web (lightweight and works well)
-          const QRCode = (await import('qrcode')).default;
-          const dataUrl = await QRCode.toDataURL(value, {
-            width: size,
-            margin: 2,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF',
-            },
-          });
-          setQrDataUrl(dataUrl);
-        } catch (error) {
-          console.error('Error generating QR code:', error);
-          // Fallback: use a simple canvas-based placeholder
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(0, 0, size, size);
-            ctx.fillStyle = '#666';
-            ctx.font = `${size / 10}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText('QR Code', size / 2, size / 2);
-            setQrDataUrl(canvas.toDataURL());
-          }
-        }
-      };
-      
-      if (value) {
-        generateQR();
-      }
-    }, [value, size]);
-    
-    if (qrDataUrl) {
-      return (
-        <img
-          src={qrDataUrl}
-          alt="QR Code"
-          style={{width: size, height: size, borderRadius: 8}}
-        />
-      );
-    }
-    
-    return (
-      <View style={[styles.qrPlaceholder, {width: size, height: size}]}>
-        <Text style={styles.qrIcon}>📱</Text>
-        <Text style={styles.qrText}>QR Code</Text>
-      </View>
-    );
-  };
-} else {
-  // Native QR code display
+// Load Canny Carrot logo for stamps
+let ccLogoImage: any = null;
+try {
+  ccLogoImage = require('../../assets/cc-icon-no-background.png');
+} catch (e) {
   try {
-    const QRCode = require('react-native-qrcode-svg').default;
-    QRCodeComponent = ({value, size}: {value: string; size: number}) => (
-      <QRCode
-        value={value}
-        size={size}
-        color={Colors.text.primary}
-        backgroundColor={Colors.background}
-      />
-    );
-  } catch (e) {
-    // Fallback if library not available
-    QRCodeComponent = ({value, size}: {value: string; size: number}) => (
-      <View style={[styles.qrPlaceholder, {width: size, height: size}]}>
-        <Text style={styles.qrIcon}>📱</Text>
-        <Text style={styles.qrText}>QR Code</Text>
-      </View>
-    );
+    ccLogoImage = require('../../assets/logo.png');
+  } catch (e2) {
+    ccLogoImage = null;
   }
 }
 
@@ -99,17 +25,44 @@ interface RewardQRCodeModalProps {
   visible: boolean;
   rewardName: string;
   qrValue: string;
+  count: number; // Points earned
+  total: number; // Points needed
+  businessName?: string;
   onClose: () => void;
-  onView: () => void; // Navigate to reward edit page
+  onNavigate?: (screen: string) => void;
 }
 
 const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   visible,
   rewardName,
-  qrValue,
+  count,
+  total,
+  businessName,
   onClose,
-  onView,
+  onNavigate,
 }) => {
+  // Create array of circles - total circles, count have stamps
+  const circles = Array.from({length: total}, (_, index) => ({
+    id: index,
+    hasStamp: index < count,
+  }));
+
+  const handleBusinessPage = () => {
+    onClose();
+    if (onNavigate) {
+      // Navigate to business page - using MenuPage as business page
+      onNavigate('Menu');
+    }
+  };
+
+  const handleMessages = () => {
+    onClose();
+    if (onNavigate) {
+      // Navigate to chat/messages page
+      onNavigate('Chat');
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -120,32 +73,42 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{rewardName}</Text>
           
-          <View style={styles.qrContainer}>
-            {qrValue ? (
-              <QRCodeComponent value={qrValue} size={200} />
-            ) : (
-              <View style={styles.qrPlaceholder}>
-                <Text style={styles.qrIcon}>📱</Text>
-                <Text style={styles.qrText}>QR Code</Text>
-                <Text style={styles.qrValue} numberOfLines={2}>
-                  No QR code available
-                </Text>
+          {/* Circles with stamps across the top */}
+          <View style={styles.circlesContainer}>
+            {circles.map((circle) => (
+              <View key={circle.id} style={styles.circleWrapper}>
+                <View style={styles.circle}>
+                  {circle.hasStamp && ccLogoImage ? (
+                    <Image
+                      source={ccLogoImage}
+                      style={styles.stampImage}
+                      resizeMode="contain"
+                    />
+                  ) : null}
+                </View>
               </View>
-            )}
+            ))}
           </View>
 
-          <View style={styles.buttonContainer}>
+          {/* Links at bottom */}
+          <View style={styles.linksContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.viewButton]}
-              onPress={onView}>
-              <Text style={styles.viewButtonText}>View</Text>
+              style={styles.linkButton}
+              onPress={handleBusinessPage}>
+              <Text style={styles.linkText}>View {businessName || 'Business'} Page</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.closeButton]}
-              onPress={onClose}>
-              <Text style={styles.closeButtonText}>Close</Text>
+              style={styles.linkButton}
+              onPress={handleMessages}>
+              <Text style={styles.linkText}>View Messages</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -162,73 +125,68 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: Colors.background,
     borderRadius: 16,
-    padding: 20,
-    width: '80%',
-    maxWidth: 350,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: Colors.text.primary,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  qrContainer: {
-    backgroundColor: Colors.background,
-    padding: 20,
-    borderRadius: 12,
     marginBottom: 24,
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qrPlaceholder: {
-    width: 200,
-    height: 200,
-    backgroundColor: Colors.neutral[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  qrIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  qrText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 8,
-  },
-  qrValue: {
-    fontSize: 12,
-    color: Colors.text.secondary,
     textAlign: 'center',
-    paddingHorizontal: 16,
   },
-  buttonContainer: {
+  circlesContainer: {
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  button: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 32,
+    paddingHorizontal: 8,
   },
-  viewButton: {
-    backgroundColor: Colors.primary,
+  circleWrapper: {
+    margin: 4,
   },
-  viewButtonText: {
+  circle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: Colors.neutral[300],
+    backgroundColor: Colors.neutral[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  stampImage: {
+    width: 46,
+    height: 46,
+  },
+  linksContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  linkButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  linkText: {
     fontSize: 16,
+    color: Colors.primary,
     fontWeight: '600',
-    color: Colors.background,
+    textAlign: 'center',
   },
   closeButton: {
     backgroundColor: Colors.neutral[200],
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 16,
@@ -238,4 +196,3 @@ const styles = StyleSheet.create({
 });
 
 export default RewardQRCodeModal;
-
