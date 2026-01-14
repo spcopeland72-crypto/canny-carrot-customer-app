@@ -30,10 +30,11 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
-import {discoveryApi, rewardsApi, type Business, type Reward} from '../services/api';
+import {discoveryApi, rewardsApi} from '../services/api';
 import {locationService, type Coordinates} from '../services/location';
 import {storage} from '../services/localStorage';
-import {SearchMode} from '../types/search.types';
+import {SearchMode, MapBounds, Coordinates as SearchCoordinates} from '../types/search.types';
+import {Business} from '../types/business.types';
 import {useAutocomplete} from '../hooks/useAutocomplete';
 import {useGeoSearch} from '../hooks/useGeoSearch';
 import {SearchProvider, useSearchContext} from '../contexts/SearchContext';
@@ -154,6 +155,8 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
   const [campaignsOnly, setCampaignsOnly] = useState(false);
   const [distance, setDistance] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState<'distance' | 'name' | 'relevance'>('distance');
+  const [distanceModalVisible, setDistanceModalVisible] = useState(false);
+  const [sortModalVisible, setSortModalVisible] = useState(false);
 
   const handleSuggestionSelect = (
     field: string,
@@ -299,6 +302,136 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
         />
       </View>
 
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>Distance</Text>
+        <TouchableOpacity
+          style={styles.dropdownButton}
+          onPress={() => setDistanceModalVisible(true)}>
+          <Text style={styles.dropdownButtonText}>
+            {distance === undefined
+              ? 'All'
+              : distance === 1
+              ? '1 mile'
+              : distance === 5
+              ? '5 miles'
+              : distance === 10
+              ? '10 miles'
+              : distance === 25
+              ? '25 miles'
+              : `${distance} miles`}
+          </Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={distanceModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDistanceModalVisible(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setDistanceModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setDistance(undefined);
+                setDistanceModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setDistance(1);
+                setDistanceModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>1 mile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setDistance(5);
+                setDistanceModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>5 miles</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setDistance(10);
+                setDistanceModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>10 miles</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setDistance(25);
+                setDistanceModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>25 miles</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>Sort By</Text>
+        <TouchableOpacity
+          style={styles.dropdownButton}
+          onPress={() => setSortModalVisible(true)}>
+          <Text style={styles.dropdownButtonText}>
+            {sortBy === 'distance'
+              ? 'Distance'
+              : sortBy === 'name'
+              ? 'Name (A-Z)'
+              : 'Relevance'}
+          </Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={sortModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSortModalVisible(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSortModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortBy('distance');
+                setSortModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>Distance</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortBy('name');
+                setSortModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>Name (A-Z)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortBy('relevance');
+                setSortModalVisible(false);
+              }}>
+              <Text style={styles.modalOptionText}>Relevance</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
         <Text style={styles.searchButtonText}>Search</Text>
       </TouchableOpacity>
@@ -312,6 +445,15 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {!loading && !error && results && results.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No businesses found</Text>
+          <Text style={styles.emptySubtext}>
+            Try expanding your search area or removing some filters
+          </Text>
         </View>
       )}
 
@@ -351,16 +493,166 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
   );
 };
 
-// Map Search Component (placeholder)
+// Map Search Component
 const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> = ({
   onNavigate,
 }) => {
+  const {performMapSearch, results, totalCount, loading, error} = useGeoSearch();
+  const [mapBusinessName, setMapBusinessName] = useState('');
+  const [mapSector, setMapSector] = useState('');
+  const [mapRewardsOnly, setMapRewardsOnly] = useState(false);
+  const [mapCampaignsOnly, setMapCampaignsOnly] = useState(false);
+  const [userLocation, setUserLocation] = useState<SearchCoordinates | null>(null);
+  const mapRef = useRef<any>(null);
+
+  useEffect(() => {
+    const getLocation = async () => {
+      try {
+        const location = await locationService.getCurrentLocation();
+        if (location) {
+          setUserLocation({lat: location.coords.latitude, lng: location.coords.longitude});
+        }
+      } catch (err) {
+        console.error('Failed to get user location:', err);
+      }
+    };
+    getLocation();
+  }, []);
+
+  const handleMapSearch = async () => {
+    if (!userLocation) {
+      return;
+    }
+    // Simple bounds calculation (can be improved with actual map bounds)
+    const bounds: MapBounds = {
+      northeast: {lat: userLocation.lat + 0.1, lng: userLocation.lng + 0.1},
+      southwest: {lat: userLocation.lat - 0.1, lng: userLocation.lng - 0.1},
+    };
+    performMapSearch(bounds, {
+      businessName: mapBusinessName || undefined,
+      sector: mapSector || undefined,
+      rewardsOnly: mapRewardsOnly,
+      campaignsOnly: mapCampaignsOnly,
+    });
+  };
+
+  const mapUrl = userLocation
+    ? `https://www.google.com/maps/embed/v1/view?key=YOUR_API_KEY&center=${userLocation.lat},${userLocation.lng}&zoom=13`
+    : 'https://www.google.com/maps/embed/v1/view?key=YOUR_API_KEY&center=51.5074,-0.1278&zoom=10';
+
   return (
-    <View style={styles.mapPlaceholder}>
-      <Text style={styles.mapTitle}>Map Search</Text>
-      <Text style={styles.mapSubtext}>
-        Map integration coming soon. Use Text Search for now.
-      </Text>
+    <View style={styles.mapContainer}>
+      {Platform.OS === 'web' ? (
+        <View style={styles.mapWrapper}>
+          <iframe
+            src={mapUrl}
+            width="100%"
+            height="100%"
+            style={{border: 0}}
+            allowFullScreen
+            loading="lazy"
+          />
+        </View>
+      ) : (
+        <View style={styles.mapPlaceholder}>
+          <Text style={styles.mapTitle}>Map View</Text>
+          <Text style={styles.mapSubtext}>
+            Map integration requires react-native-maps
+          </Text>
+        </View>
+      )}
+      <View style={styles.mapSearchPanel}>
+        <Text style={styles.sectionTitle}>Search This Area</Text>
+        <AutocompleteInput
+          fieldType="businessName"
+          placeholder="Business name"
+          value={mapBusinessName}
+          onChange={setMapBusinessName}
+          onSuggestionSelect={(s) => setMapBusinessName(s.value)}
+          onNewEntry={(v) => submitUserEntry({fieldType: 'businessName', enteredValue: v, userId: 'current-user', sessionId: 'current-session'})}
+        />
+        <AutocompleteInput
+          fieldType="sector"
+          placeholder="Sector"
+          value={mapSector}
+          onChange={setMapSector}
+          onSuggestionSelect={(s) => setMapSector(s.value)}
+          onNewEntry={(v) => submitUserEntry({fieldType: 'sector', enteredValue: v, userId: 'current-user', sessionId: 'current-session'})}
+        />
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Rewards Only</Text>
+          <Switch
+            value={mapRewardsOnly}
+            onValueChange={setMapRewardsOnly}
+            trackColor={{false: Colors.neutral[300], true: Colors.primary}}
+          />
+        </View>
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Campaigns Only</Text>
+          <Switch
+            value={mapCampaignsOnly}
+            onValueChange={setMapCampaignsOnly}
+            trackColor={{false: Colors.neutral[300], true: Colors.primary}}
+          />
+        </View>
+        <TouchableOpacity style={styles.searchButton} onPress={handleMapSearch}>
+          <Text style={styles.searchButtonText}>Search This Area</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      )}
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {!loading && !error && results && results.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No businesses found</Text>
+          <Text style={styles.emptySubtext}>
+            Try expanding your search area or removing some filters
+          </Text>
+        </View>
+      )}
+
+      {!loading && !error && results && results.length > 0 && (
+        <ScrollView style={styles.resultsContainer}>
+          <Text style={styles.resultsCount}>
+            {totalCount || results.length} {totalCount === 1 || results.length === 1 ? 'result' : 'results'} found
+          </Text>
+          {results.map((business) => (
+            <TouchableOpacity
+              key={business.id}
+              style={styles.resultCard}
+              onPress={() => onNavigate('BusinessDetail', {businessId: business.id})}>
+              {business.thumbnailUrl && (
+                <Image
+                  source={{uri: business.thumbnailUrl}}
+                  style={styles.resultThumbnail}
+                />
+              )}
+              <View style={styles.resultContent}>
+                <Text style={styles.resultName}>{business.name}</Text>
+                <Text style={styles.resultSector}>{business.sector}</Text>
+                <Text style={styles.resultAddress}>
+                  {business.location.formattedAddress}
+                </Text>
+                {business.distanceFromSearch !== undefined && (
+                  <Text style={styles.resultDistance}>
+                    {business.distanceFromSearch.toFixed(1)} miles away
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -446,18 +738,20 @@ const styles = StyleSheet.create({
   },
   modeButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
     borderRadius: 8,
     marginHorizontal: 4,
     backgroundColor: Colors.background,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
   modeButtonActive: {
     backgroundColor: Colors.primary,
   },
   modeButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: Colors.text.primary,
   },
@@ -619,10 +913,84 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text.light,
   },
-  mapPlaceholder: {
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutral[300],
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    minWidth: 120,
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: Colors.text.primary,
     flex: 1,
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 8,
+    minWidth: 200,
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalOption: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[100],
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: Colors.text.primary,
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  mapContainer: {
+    flex: 1,
+  },
+  mapWrapper: {
+    width: '100%',
+    height: 300,
+    backgroundColor: Colors.neutral[200],
+  },
+  mapPlaceholder: {
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.neutral[200],
     padding: 32,
   },
   mapTitle: {
@@ -635,6 +1003,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  mapSearchPanel: {
+    padding: 16,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.neutral[200],
   },
 });
 
