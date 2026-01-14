@@ -1364,7 +1364,7 @@ const styles = StyleSheet.create({
   tickerWrap: {
     width: '100%',
     overflow: 'hidden',
-    height: 64, // CodePen: 4rem
+    height: 45, // Reduced by 30% from 64
     backgroundColor: '#9E8F85', // Changed from black to #9E8F85
     paddingLeft: Dimensions.get('window').width, // CodePen: padding-left: 100%
     marginBottom: 24,
@@ -1372,8 +1372,8 @@ const styles = StyleSheet.create({
   ticker: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64, // CodePen: 4rem
-    lineHeight: 64, // CodePen: line-height: 4rem
+    height: 45, // Reduced by 30% from 64
+    lineHeight: 45, // Reduced by 30% from 64
     paddingRight: Dimensions.get('window').width, // CodePen: padding-right: 100%
   },
   tickerItem: {
