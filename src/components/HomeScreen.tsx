@@ -1374,7 +1374,7 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
     height: 64, // CodePen: 4rem
-    backgroundColor: 'rgba(0, 0, 0, 0.9)', // CodePen: rgba(#000, 0.9)
+    backgroundColor: '#9E8F85', // Changed from black to #9E8F85
     paddingLeft: Dimensions.get('window').width, // CodePen: padding-left: 100%
     marginBottom: 24,
   },
