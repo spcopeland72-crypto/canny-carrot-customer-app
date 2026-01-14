@@ -228,7 +228,7 @@ function App(): React.JSX.Element {
         );
       case 'FindMoreRewards':
         return (
-          <FindMoreRewardsPage
+          <SearchPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}

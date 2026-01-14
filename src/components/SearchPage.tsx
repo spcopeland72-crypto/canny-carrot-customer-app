@@ -672,7 +672,8 @@ const SearchPageContent: React.FC<SearchPageProps> = ({
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       onBack={onBack}
-      onScanPress={onScanPress}>
+      onScanPress={onScanPress}
+      showBanner={false}>
       <View style={styles.container}>
         <View style={styles.modeToggle}>
           <TouchableOpacity

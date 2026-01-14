@@ -887,7 +887,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.goodieCard}
                 onPress={() => {
                   if (card.id === '1') {
-                    onNavigate('FindMoreRewards');
+                    onNavigate('Search');
                   } else if (card.id === '2') {
                     onNavigate('FeaturedCampaigns');
                   } else if (card.id === '3') {
