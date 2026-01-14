@@ -714,8 +714,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: tickerWidth > 0 
-                        ? [0, -tickerWidth] // Move by full measured width (includes text + paddingRight)
-                        : [0, -(screenWidth * 4)], // Fallback: ensure enough movement to show text
+                        ? [0, -tickerWidth] // CodePen: translate3d(-100%, 0, 0) = -100% of ticker element width
+                        : [0, 0], // Don't animate until width is measured correctly
                     }),
                   },
                 ],
