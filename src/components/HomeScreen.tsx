@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   SafeAreaView,
   Image,
   Linking,
+  Animated,
+  Easing,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {getTimeBasedGreeting} from '../utils/timeGreeting';
@@ -289,6 +291,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [userName] = useState('Simon'); // This would come from user context
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
+  
+  // Ticker animation
+  const tickerAnim = useRef(new Animated.Value(0)).current;
+  const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
+  
+  useEffect(() => {
+    const screenWidth = Dimensions.get('window').width;
+    const textWidth = tickerText.length * 7; // Approximate character width
+    const translateX = -(textWidth + screenWidth);
+    
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(tickerAnim, {
+          toValue: translateX,
+          duration: 15000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tickerAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [tickerText]);
   const [findMoreRewardsModalVisible, setFindMoreRewardsModalVisible] =
     useState(false);
   const [scanModalVisible, setScanModalVisible] = useState(false);
@@ -640,7 +670,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Ticker */}
         <View style={styles.tickerContainer}>
-          <Text style={styles.tickerText}>Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers</Text>
+          <View style={styles.tickerWrapper}>
+            <Animated.View style={[styles.tickerContent, {transform: [{translateX: tickerAnim}]}]}>
+              <Text style={styles.tickerText}>{tickerText}</Text>
+              <Text style={styles.tickerText}>{' '}{tickerText}</Text>
+            </Animated.View>
+          </View>
         </View>
 
         {/* Rewards Section */}
@@ -1284,14 +1319,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: Colors.neutral[200],
     paddingVertical: 8,
-    paddingHorizontal: 16,
     marginBottom: 24,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  tickerWrapper: {
+    overflow: 'hidden',
+    height: 20,
+  },
+  tickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   tickerText: {
     fontSize: 12,
     color: Colors.text.primary,
     fontWeight: '500',
-    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   bannerTextContainer: {
     flex: 1,
