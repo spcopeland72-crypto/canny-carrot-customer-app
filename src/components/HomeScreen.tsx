@@ -683,6 +683,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
+        {/* Ticker - Exact CodePen implementation - Below banner */}
+        <View style={styles.tickerWrap}>
+          <Animated.View
+            style={[
+              styles.ticker,
+              {
+                transform: [
+                  {
+                    translateX: tickerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            onLayout={(event) => {
+              const { width } = event.nativeEvent.layout;
+              if (width > 0 && tickerWidth !== width) {
+                setTickerWidth(width);
+              }
+            }}
+          >
+            <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
+            <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
+          </Animated.View>
+        </View>
+
         {/* Rewards Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1018,34 +1046,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </ScrollView>
 
-      {/* Ticker - Exact CodePen implementation - Outside ScrollView for fixed positioning */}
-      <View style={styles.tickerWrap}>
-        <Animated.View
-          style={[
-            styles.ticker,
-            {
-              transform: [
-                {
-                  translateX: tickerAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
-                  }),
-                },
-              ],
-            },
-          ]}
-          onLayout={(event) => {
-            const { width } = event.nativeEvent.layout;
-            if (width > 0 && tickerWidth !== width) {
-              setTickerWidth(width);
-            }
-          }}
-        >
-          <Text style={styles.tickerItem}>{tickerText}</Text>
-          <Text style={styles.tickerItem}>{tickerText}</Text>
-        </Animated.View>
-      </View>
-
       {/* Bottom Navigation */}
       <BottomNavigation
         currentScreen={currentScreen}
@@ -1343,29 +1343,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   // Ticker styles - Exact CodePen CSS conversion
+  // Ticker styles - Exact CodePen CSS conversion (adapted for React Native)
   tickerWrap: {
-    ...(Platform.OS === 'web' ? { position: 'fixed' as any } : { position: 'absolute' }),
-    bottom: 0,
-    left: 0,
-    right: 0,
     width: '100%',
     overflow: 'hidden',
-    height: 64, // 4rem = 64px
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    height: 32, // Reduced height to prevent text wrapping
+    backgroundColor: Colors.neutral[50], // White background, not black
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.neutral[200],
     paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes content off-screen right)
-    zIndex: 1000, // Ensure ticker is above other content
+    marginBottom: 24,
   },
   ticker: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64, // 4rem = 64px
+    height: 32,
     paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text)
   },
   tickerItem: {
-    paddingHorizontal: 32, // 2rem = 32px (0 2rem)
-    fontSize: 32, // 2rem = 32px
-    color: 'white',
+    paddingHorizontal: 16, // Reduced padding
+    fontSize: 12, // Smaller font to prevent wrapping and show full text
+    color: Colors.text.primary, // App text color
     includeFontPadding: false,
+    flexShrink: 0, // Prevent shrinking - ensures full text displays
   },
   bannerTextContainer: {
     flex: 1,
