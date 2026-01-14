@@ -3,14 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  Image,
   ActivityIndicator,
+  Alert,
   Platform,
   Linking,
-  Image,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
@@ -18,7 +18,7 @@ import {discoveryApi, type Business, type Reward} from '../services/api';
 import {locationService, type Coordinates} from '../services/location';
 import {addOrUpdateBusiness} from '../utils/businessStorage';
 
-interface SearchPageProps {
+interface FindMoreRewardsPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
@@ -31,22 +31,36 @@ interface BusinessWithDistance extends Business {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
-const SCREEN_HEIGHT = Dimensions.get('window').height || 667;
 
-const SearchPage: React.FC<SearchPageProps> = ({
+const FindMoreRewardsPage: React.FC<FindMoreRewardsPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
   onScanPress,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
-  const [mapReady, setMapReady] = useState(false);
+  const [businessRewards, setBusinessRewards] = useState<Reward[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [mapView, setMapView] = useState<'map' | 'list'>('list');
+  const mapRef = useRef<any>(null);
+
+  // Categories for filtering
+  const categories = [
+    'All',
+    'Restaurant',
+    'Cafe',
+    'Retail',
+    'Beauty',
+    'Fitness',
+    'Entertainment',
+    'Other',
+  ];
 
   // Request location permission and get user location
   useEffect(() => {
@@ -67,93 +81,32 @@ const SearchPage: React.FC<SearchPageProps> = ({
     initializeLocation();
   }, []);
 
-  // Load nearby businesses when location is available
+  // Load nearby businesses
   useEffect(() => {
-    if (userLocation && viewMode === 'map') {
-      loadNearbyBusinesses();
-    }
-  }, [userLocation, viewMode]);
+    loadBusinesses();
+  }, [userLocation, selectedCategory]);
 
-  const loadNearbyBusinesses = async () => {
-    if (!userLocation) return;
-
+  const loadBusinesses = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await discoveryApi.findNearby({
-        lat: userLocation.latitude,
-        lng: userLocation.longitude,
-      });
-
-      if (result.success && result.data) {
-        let businessesList = result.data.map((business) => {
-          if (business.address?.latitude && business.address?.longitude) {
-            const distance = locationService.calculateDistance(
-              userLocation,
-              {
-                latitude: business.address.latitude,
-                longitude: business.address.longitude,
-              }
-            );
-            return {
-              ...business,
-              distance,
-              distanceFormatted: locationService.formatDistance(distance),
-            };
-          }
-          return business;
-        });
-
-        // Sort by distance
-        businessesList.sort((a, b) => {
-          const distA = (a as BusinessWithDistance).distance || Infinity;
-          const distB = (b as BusinessWithDistance).distance || Infinity;
-          return distA - distB;
-        });
-
-        setBusinesses(businessesList);
-
-        // Cache businesses
-        businessesList.forEach((business) => {
-          addOrUpdateBusiness({
-            id: business.id,
-            name: business.name,
-            address: business.address?.line1 || '',
-            phone: business.phone,
-            email: business.email,
-            website: business.website,
-            socialMedia: business.socialMedia,
-            createdAt: business.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        });
-      } else {
-        setError(result.error || 'Failed to load businesses');
-      }
-    } catch (err) {
-      console.error('Error loading businesses:', err);
-      setError('Failed to load businesses. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-
-    if (!query.trim()) {
+      let result;
+      
       if (userLocation) {
-        loadNearbyBusinesses();
+        // Find nearby businesses
+        result = await discoveryApi.findNearby(
+          {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+          },
+          selectedCategory && selectedCategory !== 'All' ? selectedCategory : undefined
+        );
+      } else {
+        // Get featured businesses if no location
+        result = await discoveryApi.getFeatured();
       }
-      return;
-    }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await discoveryApi.search(query);
       if (result.success && result.data) {
         let businessesList = result.data;
 
@@ -186,6 +139,46 @@ const SearchPage: React.FC<SearchPageProps> = ({
         }
 
         setBusinesses(businessesList);
+
+        // Cache businesses
+        businessesList.forEach((business) => {
+          addOrUpdateBusiness({
+            id: business.id,
+            name: business.name,
+            address: business.address?.line1 || '',
+            phone: business.phone,
+            email: business.email,
+            website: business.website,
+            socialMedia: business.socialMedia,
+            createdAt: business.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        });
+      } else {
+        setError(result.error || 'Failed to load businesses');
+      }
+    } catch (err) {
+      console.error('Error loading businesses:', err);
+      setError('Failed to load businesses. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Search businesses
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      loadBusinesses();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await discoveryApi.search(query);
+      if (result.success && result.data) {
+        setBusinesses(result.data);
       } else {
         setError(result.error || 'Search failed');
       }
@@ -197,8 +190,31 @@ const SearchPage: React.FC<SearchPageProps> = ({
     }
   };
 
+  // Load rewards for a business
+  const loadBusinessRewards = async (businessId: string) => {
+    setLoadingRewards(true);
+    try {
+      const result = await discoveryApi.getBusinessDetails(businessId);
+      if (result.success && result.data?.rewards) {
+        setBusinessRewards(result.data.rewards);
+      }
+    } catch (err) {
+      console.error('Error loading rewards:', err);
+    } finally {
+      setLoadingRewards(false);
+    }
+  };
+
+  // Handle business selection
+  const handleBusinessSelect = async (business: Business) => {
+    setSelectedBusiness(business);
+    await loadBusinessRewards(business.id);
+  };
+
+  // Handle get directions
   const handleGetDirections = (business: Business) => {
     if (!business.address?.latitude || !business.address?.longitude) {
+      Alert.alert('Error', 'Business location not available');
       return;
     }
 
@@ -210,104 +226,47 @@ const SearchPage: React.FC<SearchPageProps> = ({
 
     Linking.openURL(url).catch((err) => {
       console.error('Error opening maps:', err);
+      Alert.alert('Error', 'Could not open maps application');
     });
   };
 
-  const openGoogleMaps = () => {
-    if (!userLocation) {
-      return;
-    }
-
-    const url = `https://www.google.com/maps/search/?api=1&query=${userLocation.latitude},${userLocation.longitude}`;
-    Linking.openURL(url).catch((err) => {
-      console.error('Error opening Google Maps:', err);
-    });
-  };
-
-  // Render map view (Google Maps integration)
+  // Render map view (placeholder for Google Maps integration)
   const renderMapView = () => {
     return (
       <View style={styles.mapContainer}>
         <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapTitle}>Interactive Map</Text>
+          <Text style={styles.mapText}>Map View</Text>
           <Text style={styles.mapSubtext}>
             {userLocation
-              ? 'Business locations displayed on map'
+              ? 'Interactive map with business markers'
               : 'Enable location to see map'}
           </Text>
           {userLocation && (
-            <>
-              <Text style={styles.mapCoordinates}>
-                Your location: {userLocation.latitude.toFixed(4)},{' '}
-                {userLocation.longitude.toFixed(4)}
-              </Text>
-              <Text style={styles.businessCount}>
-                {businesses.length} businesses nearby
-              </Text>
-              <TouchableOpacity
-                style={styles.openMapsButton}
-                onPress={openGoogleMaps}>
-                <Text style={styles.openMapsButtonText}>
-                  Open in Google Maps
-                </Text>
-              </TouchableOpacity>
-            </>
+            <Text style={styles.mapCoordinates}>
+              Your location: {userLocation.latitude.toFixed(4)},{' '}
+              {userLocation.longitude.toFixed(4)}
+            </Text>
           )}
-          {!userLocation && (
-            <TouchableOpacity
-              style={styles.enableLocationButton}
-              onPress={async () => {
-                const hasPermission = await locationService.requestPermission();
-                if (hasPermission) {
-                  const location = await locationService.getCurrentLocation();
-                  if (location) {
-                    setUserLocation(location.coords);
-                  }
-                }
-              }}>
-              <Text style={styles.enableLocationButtonText}>
-                Enable Location
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => {
+              // Navigate to SearchPage with map view
+              onNavigate('Search');
+            }}>
+            <Text style={styles.mapButtonText}>Open Full Map</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Business markers overlay (simulated) */}
-        {userLocation && businesses.length > 0 && (
-          <View style={styles.markersOverlay}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.markersList}>
-              {businesses.slice(0, 5).map((business) => (
-                <TouchableOpacity
-                  key={business.id}
-                  style={styles.markerCard}
-                  onPress={() => setSelectedBusiness(business)}>
-                  <Text style={styles.markerName} numberOfLines={1}>
-                    {business.name}
-                  </Text>
-                  {(business as BusinessWithDistance).distanceFormatted && (
-                    <Text style={styles.markerDistance}>
-                      {(business as BusinessWithDistance).distanceFormatted}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
       </View>
     );
   };
 
-  // Render list view
-  const renderListView = () => {
+  // Render business list
+  const renderBusinessList = () => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>Loading businesses...</Text>
         </View>
       );
     }
@@ -318,13 +277,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => {
-              if (searchQuery) {
-                handleSearch(searchQuery);
-              } else {
-                loadNearbyBusinesses();
-              }
-            }}>
+            onPress={loadBusinesses}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -336,9 +289,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
         <View style={styles.centerContainer}>
           <Text style={styles.emptyText}>No businesses found</Text>
           <Text style={styles.emptySubtext}>
-            {searchQuery
-              ? 'Try a different search term'
-              : 'Enable location to find nearby businesses'}
+            Try adjusting your search or filters
           </Text>
         </View>
       );
@@ -350,7 +301,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
           <TouchableOpacity
             key={business.id}
             style={styles.businessCard}
-            onPress={() => setSelectedBusiness(business)}>
+            onPress={() => handleBusinessSelect(business)}>
             <View style={styles.businessCardContent}>
               {business.logo && (
                 <Image
@@ -375,13 +326,20 @@ const SearchPage: React.FC<SearchPageProps> = ({
                     📍 {(business as BusinessWithDistance).distanceFormatted} away
                   </Text>
                 )}
+                {business.description && (
+                  <Text style={styles.businessDescription} numberOfLines={2}>
+                    {business.description}
+                  </Text>
+                )}
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.directionsButton}
-              onPress={() => handleGetDirections(business)}>
-              <Text style={styles.directionsButtonText}>Directions</Text>
-            </TouchableOpacity>
+            <View style={styles.businessActions}>
+              <TouchableOpacity
+                style={styles.directionsButton}
+                onPress={() => handleGetDirections(business)}>
+                <Text style={styles.directionsButtonText}>Directions</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -390,7 +348,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
 
   return (
     <PageTemplate
-      title="Search & Map"
+      title="Find More Rewards"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       onBack={onBack}
@@ -400,53 +358,89 @@ const SearchPage: React.FC<SearchPageProps> = ({
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
+            <Text
               style={styles.searchInput}
-              placeholder="Search businesses, rewards..."
-              placeholderTextColor={Colors.text.light}
-              value={searchQuery}
-              onChangeText={handleSearch}
-              returnKeyType="search"
-            />
+              onPress={() => {
+                // Navigate to SearchPage for full search functionality
+                onNavigate('Search');
+              }}>
+              Search businesses, rewards...
+            </Text>
           </View>
         </View>
+
+        {/* Category Filter */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryContainer}>
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.categoryChip,
+                selectedCategory === category ||
+                (category === 'All' && selectedCategory === null)
+                  ? styles.categoryChipActive
+                  : null,
+              ]}
+              onPress={() => {
+                setSelectedCategory(category === 'All' ? null : category);
+              }}>
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  selectedCategory === category ||
+                  (category === 'All' && selectedCategory === null)
+                    ? styles.categoryChipTextActive
+                    : null,
+                ]}>
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* View Toggle */}
         <View style={styles.viewToggle}>
           <TouchableOpacity
             style={[
               styles.viewToggleButton,
-              viewMode === 'map' ? styles.viewToggleButtonActive : null,
+              mapView === 'list' ? styles.viewToggleButtonActive : null,
             ]}
-            onPress={() => setViewMode('map')}>
+            onPress={() => setMapView('list')}>
             <Text
               style={[
                 styles.viewToggleText,
-                viewMode === 'map' ? styles.viewToggleTextActive : null,
+                mapView === 'list' ? styles.viewToggleTextActive : null,
               ]}>
-              Map
+              List
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.viewToggleButton,
-              viewMode === 'list' ? styles.viewToggleButtonActive : null,
+              mapView === 'map' ? styles.viewToggleButtonActive : null,
             ]}
-            onPress={() => setViewMode('list')}>
+            onPress={() => {
+              setMapView('map');
+              // Navigate to SearchPage for full map functionality
+              onNavigate('Search');
+            }}>
             <Text
               style={[
                 styles.viewToggleText,
-                viewMode === 'list' ? styles.viewToggleTextActive : null,
+                mapView === 'map' ? styles.viewToggleTextActive : null,
               ]}>
-              List
+              Map
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Content */}
-        {viewMode === 'map' ? renderMapView() : renderListView()}
+        {mapView === 'map' ? renderMapView() : renderBusinessList()}
 
-        {/* Business Details Modal */}
+        {/* Business Details Modal (if selected) */}
         {selectedBusiness && (
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -478,12 +472,32 @@ const SearchPage: React.FC<SearchPageProps> = ({
                   </View>
                 )}
 
+                {loadingRewards ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : businessRewards.length > 0 ? (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Available Rewards</Text>
+                    {businessRewards.map((reward) => (
+                      <View key={reward.id} style={styles.rewardItem}>
+                        <Text style={styles.rewardName}>{reward.name}</Text>
+                        <Text style={styles.rewardDescription}>
+                          {reward.description}
+                        </Text>
+                        <Text style={styles.rewardRequirement}>
+                          {reward.stampsRequired} stamps required
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.noRewardsText}>
+                    No rewards available at this business
+                  </Text>
+                )}
+
                 <TouchableOpacity
                   style={styles.modalActionButton}
-                  onPress={() => {
-                    handleGetDirections(selectedBusiness);
-                    setSelectedBusiness(null);
-                  }}>
+                  onPress={() => handleGetDirections(selectedBusiness)}>
                   <Text style={styles.modalActionButtonText}>Get Directions</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -524,6 +538,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text.primary,
   },
+  categoryContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    maxHeight: 50,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.neutral[100],
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    fontWeight: '500',
+  },
+  categoryChipTextActive: {
+    color: Colors.background,
+  },
   viewToggle: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -553,8 +593,7 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
-    height: SCREEN_HEIGHT * 0.6,
-    position: 'relative',
+    height: 400,
   },
   mapPlaceholder: {
     flex: 1,
@@ -563,8 +602,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  mapTitle: {
-    fontSize: 24,
+  mapText: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.primary,
     marginBottom: 8,
@@ -578,70 +617,17 @@ const styles = StyleSheet.create({
   mapCoordinates: {
     fontSize: 12,
     color: Colors.text.light,
-    marginBottom: 8,
-  },
-  businessCount: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    fontWeight: '600',
     marginBottom: 16,
   },
-  openMapsButton: {
+  mapButton: {
     backgroundColor: Colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 8,
   },
-  openMapsButtonText: {
+  mapButtonText: {
     color: Colors.background,
     fontSize: 16,
-    fontWeight: '600',
-  },
-  enableLocationButton: {
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  enableLocationButtonText: {
-    color: Colors.background,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  markersOverlay: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-  },
-  markersList: {
-    paddingHorizontal: 16,
-  },
-  markerCard: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 8,
-    minWidth: 120,
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  markerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  markerDistance: {
-    fontSize: 12,
-    color: Colors.primary,
     fontWeight: '600',
   },
   businessList: {
@@ -697,13 +683,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.primary,
     fontWeight: '600',
+    marginBottom: 4,
+  },
+  businessDescription: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginTop: 4,
+  },
+  businessActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   directionsButton: {
     backgroundColor: Colors.secondary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    alignSelf: 'flex-end',
   },
   directionsButtonText: {
     color: Colors.background,
@@ -821,6 +816,35 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     lineHeight: 20,
   },
+  rewardItem: {
+    backgroundColor: Colors.neutral[50],
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  rewardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  rewardDescription: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginBottom: 4,
+  },
+  rewardRequirement: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  noRewardsText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 16,
+  },
   modalActionButton: {
     backgroundColor: Colors.primary,
     paddingVertical: 12,
@@ -835,4 +859,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SearchPage;
+export default FindMoreRewardsPage;
+

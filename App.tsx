@@ -35,6 +35,7 @@ import SearchPage from './src/components/SearchPage';
 import ScanPage from './src/components/ScanPage';
 import WalletPage from './src/components/WalletPage';
 import MorePage from './src/components/MorePage';
+import FindMoreRewardsPage from './src/components/FindMoreRewardsPage';
 import AccountPage from './src/components/AccountPage';
 import OrdersPage from './src/components/OrdersPage';
 import FindShopPage from './src/components/FindShopPage';
@@ -209,6 +210,15 @@ function App(): React.JSX.Element {
       case 'Search':
         return (
           <SearchPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'FindMoreRewards':
+        return (
+          <FindMoreRewardsPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}
