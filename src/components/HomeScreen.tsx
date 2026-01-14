@@ -712,8 +712,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: tickerWidth > 0 
-                        ? [0, -tickerWidth] // Move by full measured width
-                        : [0, -(screenWidth * 3)], // Fallback: move by 3x screen width
+                        ? [0, -tickerWidth] // Move by full measured width (includes text + paddingRight)
+                        : [0, -(screenWidth * 4)], // Fallback: ensure enough movement to show text
                     }),
                   },
                 ],
@@ -729,8 +729,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               }
             }}
           >
-            <Text style={styles.tickerItem} numberOfLines={1} ellipsizeMode="clip">{tickerText}</Text>
-            <Text style={styles.tickerItem} numberOfLines={1} ellipsizeMode="clip">{tickerText}</Text>
+            <Text style={styles.tickerItem}>{tickerText}</Text>
+            <Text style={styles.tickerItem}>{tickerText}</Text>
           </Animated.View>
         </View>
 
@@ -1382,8 +1382,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 32,
     paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text for seamless loop)
-    // Ensure content doesn't get clipped
-    minWidth: '100%',
   },
   tickerItem: {
     paddingHorizontal: 16,
