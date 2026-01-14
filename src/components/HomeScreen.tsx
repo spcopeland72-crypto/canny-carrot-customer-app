@@ -402,11 +402,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Convert loaded rewards to RewardCard format, or use default sample data
   // Sort by newest first (most recently created/scanned appears first)
-  console.log('[HomeScreen] Props rewards received:', propsRewards.length, 'rewards');
-  if (propsRewards.length > 0) {
-    console.log('[HomeScreen] Reward IDs:', propsRewards.map(r => ({ id: r.id, name: r.name, createdAt: r.createdAt })));
-  }
-  
   const sortedRewards = propsRewards.length > 0
     ? [...propsRewards].sort((a, b) => {
         // Sort by createdAt (newest first), then by id as fallback
@@ -416,8 +411,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         return b.id.localeCompare(a.id); // Fallback: sort by id descending
       })
     : [];
-  
-  console.log('[HomeScreen] Sorted rewards:', sortedRewards.length, 'rewards');
   
   const rewardCards: RewardCard[] = sortedRewards.length > 0
     ? sortedRewards.map(reward => ({
@@ -441,8 +434,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         {id: '5', title: 'Hot Meals', count: 6, total: 10, icon: '🍲'},
         {id: '6', title: 'Breakfast', count: 5, total: 10, icon: '🥞'},
       ];
-  
-  console.log('[HomeScreen] Final reward cards:', rewardCards.length, 'cards');
 
   const goodieCards: GoodieCard[] = [
     {id: '1', title: 'Find More Rewards', image: ''},
