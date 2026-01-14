@@ -80,11 +80,13 @@ const SearchPage: React.FC<SearchPageProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [searchCache, setSearchCache] = useState<Map<string, SearchResult[]>>(new Map());
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load search history
+  // Load search history and cache
   useEffect(() => {
     loadSearchHistory();
+    loadSearchCache();
   }, []);
 
   // Request location permission
@@ -117,6 +119,44 @@ const SearchPage: React.FC<SearchPageProps> = ({
     }
   };
 
+  const loadSearchCache = async () => {
+    try {
+      const cached = await storage.get<Record<string, SearchResult[]>>('search_cache');
+      if (cached) {
+        const cacheMap = new Map<string, SearchResult[]>();
+        Object.entries(cached).forEach(([key, value]) => {
+          cacheMap.set(key, value);
+        });
+        setSearchCache(cacheMap);
+      }
+    } catch (err) {
+      console.error('Error loading search cache:', err);
+    }
+  };
+
+  const saveSearchCache = async (query: string, results: SearchResult[]) => {
+    try {
+      const cacheKey = `${query.toLowerCase()}_${searchType}_${selectedCategory}_${distanceFilter}`;
+      const newCache = new Map(searchCache);
+      newCache.set(cacheKey, results);
+      setSearchCache(newCache);
+      
+      // Save to storage (keep last 50 cached searches)
+      const cacheObj: Record<string, SearchResult[]> = {};
+      Array.from(newCache.entries()).slice(-50).forEach(([key, value]) => {
+        cacheObj[key] = value;
+      });
+      await storage.set('search_cache', cacheObj);
+    } catch (err) {
+      console.error('Error saving search cache:', err);
+    }
+  };
+
+  const getCachedResults = (query: string): SearchResult[] | null => {
+    const cacheKey = `${query.toLowerCase()}_${searchType}_${selectedCategory}_${distanceFilter}`;
+    return searchCache.get(cacheKey) || null;
+  };
+
   const saveSearchHistory = async (query: string) => {
     if (!query.trim()) return;
     
@@ -136,6 +176,17 @@ const SearchPage: React.FC<SearchPageProps> = ({
       setBusinesses([]);
       setRewards([]);
       setCampaigns([]);
+      return;
+    }
+
+    // Check cache first
+    const cached = getCachedResults(query);
+    if (cached && cached.length > 0) {
+      setResults(cached);
+      setBusinesses(cached.filter(r => r.type === 'business').map(r => r.business!).filter(Boolean));
+      setRewards(cached.filter(r => r.type === 'reward').map(r => r.reward!).filter(Boolean));
+      setCampaigns(cached.filter(r => r.type === 'campaign').map(r => r.campaign!).filter(Boolean));
+      setLoading(false);
       return;
     }
 
@@ -229,6 +280,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
 
       setResults(allResults);
       await saveSearchHistory(query);
+      await saveSearchCache(query, allResults);
     } catch (err) {
       console.error('Search error:', err);
       setError('Search failed. Please try again.');

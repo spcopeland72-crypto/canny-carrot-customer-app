@@ -292,45 +292,71 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // Ticker animation - seamless continuous scroll where each letter wraps from left to right
+  // Ticker animation - smooth pixel scrolling with character-based circular wrap
+  // HOW IT WORKS:
+  // 1. Text moves smoothly pixel-by-pixel from right to left
+  // 2. When a character fully exits left screen, it wraps to rightmost position
+  // 3. All characters continuously shift left
+  // 4. Example: "Canny" -> "C" exits left, appears on right -> "annyC" -> "a" exits, appears -> "nnyCa"
+  // 5. Uses Animated.Value for smooth pixel movement, text rendered multiple times for seamless wrap
+  
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
-  const spacing = "          "; // 10 spaces for gap between repetitions
-  // Create seamless loop: text + spacing + text + spacing
-  // When first instance scrolls completely off left, second instance is already visible
-  // Animation loops back to start position seamlessly
-  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}`;
+  const spacing = "          "; // 10 spaces
+  const fullText = `${tickerText}${spacing}`;
+  // Render text 3 times for seamless wrap: [text][text][text]
+  const tickerContent = `${fullText}${fullText}${fullText}`;
+  const [textWidth, setTextWidth] = useState(0);
+  const textWidthRef = useRef(0);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  
+  // Measure actual width of ONE instance (fullText)
+  const handleTickerLayout = (event: any) => {
+    const { width } = event.nativeEvent.layout;
+    // We measured 3 instances, so divide by 3 to get one instance width
+    const oneInstanceWidth = width / 3;
+    if (oneInstanceWidth > 0 && oneInstanceWidth !== textWidthRef.current) {
+      textWidthRef.current = oneInstanceWidth;
+      setTextWidth(oneInstanceWidth);
+    }
+  };
   
   useEffect(() => {
-    const screenWidth = Dimensions.get('window').width;
-    // Calculate width of one complete instance (text + spacing)
-    // Using more accurate measurement: 12px font ≈ 6.2px average char width
-    const textWidth = tickerText.length * 6.2;
-    const spacingWidth = spacing.length * 6.2;
-    const singleInstanceWidth = textWidth + spacingWidth;
+    if (textWidth === 0) return; // Wait for layout measurement
+    
+    // Stop any existing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
     
     // Start animation from 0
     tickerAnim.setValue(0);
     
-    // Create infinite loop animation
-    // Animates from 0 to -singleInstanceWidth (one full instance scrolls left)
-    // When it loops back to 0, the second copy is perfectly positioned to continue seamlessly
+    // Create seamless infinite loop
+    // Animates from 0 to -textWidth (one full instance scrolls left)
+    // When first instance's "C" reaches -textWidth (fully off left),
+    // second instance's "C" is at position 0 (right edge of screen)
+    // Animation loops back to 0 - second instance continues seamlessly
+    // Each character that exits left immediately appears on right
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
-        toValue: -singleInstanceWidth,
-        duration: 25000, // Smooth scrolling speed
+        toValue: -textWidth,
+        duration: 20000, // Smooth scrolling speed (adjust for faster/slower)
         easing: Easing.linear, // Linear for constant speed
         useNativeDriver: true,
       }),
       { iterations: -1 } // Infinite loop
     );
     
+    animationRef.current = animation;
     animation.start();
     
     return () => {
-      animation.stop();
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
     };
-  }, []);
+  }, [textWidth]);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -679,7 +705,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* Ticker */}
+        {/* Ticker - Smooth pixel scrolling with character wrap */}
         <View style={styles.tickerContainer}>
           <View style={styles.tickerWrapper} collapsable={false}>
             <Animated.View 
@@ -690,8 +716,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
               ]}
               collapsable={false}
+              onLayout={handleTickerLayout}
             >
-              <Text style={styles.tickerText} numberOfLines={1}>{tickerContent}</Text>
+              {/* Render text 3 times: when first "C" exits left, second "C" appears on right */}
+              {/* Animation moves from 0 to -textWidth, then loops back to 0 seamlessly */}
+              <Text style={styles.tickerText} numberOfLines={1}>
+                {tickerContent}
+              </Text>
             </Animated.View>
           </View>
         </View>
@@ -1345,7 +1376,7 @@ const styles = StyleSheet.create({
   tickerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '200%', // Ensure enough width for seamless loop
+    // Contains 3 copies of text for seamless wrap
   },
   tickerText: {
     fontSize: 12,
@@ -1354,7 +1385,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexShrink: 0,
     includeFontPadding: false,
-    whiteSpace: 'nowrap',
+    // Text contains 3 copies: "Canny... [spacing] Canny... [spacing] Canny... [spacing]"
+    // When first "C" scrolls off left at -textWidth, second "C" is at position 0 (right edge)
+    // Animation loops to 0 - second copy continues seamlessly
+    // Each character that exits left immediately appears on right
   },
   bannerTextContainer: {
     flex: 1,
