@@ -300,20 +300,32 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // Permanent continuous loop - no timer, no reset
+  // Continuous scroll - no restart, no reset, just continues infinitely
   useEffect(() => {
     if (tickerWidth > 0 && !animationRef.current) {
-      // const duration = 30000; // TIMER COMMENTED OUT
-      animationRef.current = Animated.loop(
-        Animated.timing(tickerAnimation, {
-          toValue: 1,
-          duration: 30000, // Keep duration for animation speed, but loop is permanent
+      // Create continuous animation that never resets
+      const startContinuousAnimation = () => {
+        // Animate from current value to current + 1 (seamless continuation)
+        const currentValue = tickerAnimation._value || 0;
+        const targetValue = currentValue + 1;
+        
+        animationRef.current = Animated.timing(tickerAnimation, {
+          toValue: targetValue,
+          duration: 30000, // Speed of animation
           easing: Easing.linear,
           useNativeDriver: Platform.OS !== 'web',
-        }),
-        { iterations: -1 } // Permanent infinite loop
-      );
-      animationRef.current.start();
+        });
+        
+        animationRef.current.start((finished) => {
+          if (finished) {
+            // Continue to next cycle without reset
+            animationRef.current = null;
+            startContinuousAnimation();
+          }
+        });
+      };
+      
+      startContinuousAnimation();
     }
   }, [tickerWidth]);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
@@ -695,8 +707,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: tickerWidth > 0 
-                        ? [0, -(tickerWidth + screenWidth)] // Move completely off left border, then loop
+                        ? [0, -(tickerWidth + screenWidth)] // Move completely off left border
                         : [0, 0],
+                      extrapolate: 'extend', // Continue seamlessly beyond inputRange for continuous scroll
                     }),
                   },
                 ],
