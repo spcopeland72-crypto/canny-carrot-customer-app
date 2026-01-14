@@ -1378,7 +1378,7 @@ const styles = StyleSheet.create({
   },
   tickerItem: {
     paddingHorizontal: 32, // CodePen: 0 2rem
-    fontSize: 32, // CodePen: 2rem
+    fontSize: 26, // Reduced by 20% from 32
     color: 'white', // CodePen: color: white
     includeFontPadding: false,
     flexShrink: 0,
