@@ -34,7 +34,6 @@ import {loadRewards, saveRewards} from '../utils/dataStorage';
 // Import images at module level
 // Path from src/components/ to assets/ is ../../assets/
 let logoImage;
-let bannerImage;
 
 try {
   logoImage = require('../../assets/logo.png');
@@ -213,10 +212,11 @@ try {
 // Load CC icon for banner logo
 let ccIconImage: any = null;
 try {
+  // Try to load cc-icon, but don't fail if it doesn't exist
   ccIconImage = require('../../assets/cc-icon-no-background.png');
-  console.log('[HomeScreen] CC icon loaded from assets');
 } catch (e) {
-  console.log('[HomeScreen] CC icon not found in assets:', e);
+  // Icon not found - will use placeholder
+  ccIconImage = null;
 }
 
 const facebookIcon = require('../../Images/facebook.png');
