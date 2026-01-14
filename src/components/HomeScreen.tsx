@@ -12,6 +12,7 @@ import {
   Linking,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {getTimeBasedGreeting} from '../utils/timeGreeting';
@@ -311,12 +312,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     }
     tickerAnimation.setValue(0);
     const duration = 30000; // 30 seconds as per CodePen
+    // useNativeDriver doesn't work on web, use false for web platform
     animationRef.current = Animated.loop(
       Animated.timing(tickerAnimation, {
         toValue: 1,
         duration: duration,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       })
     );
     animationRef.current.start();
@@ -681,34 +683,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* Ticker - Exact CodePen implementation */}
-        <View style={styles.tickerWrap}>
-          <Animated.View
-            style={[
-              styles.ticker,
-              {
-                transform: [
-                  {
-                    translateX: tickerAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
-                    }),
-                  },
-                ],
-              },
-            ]}
-            onLayout={(event) => {
-              const { width } = event.nativeEvent.layout;
-              if (width > 0 && tickerWidth !== width) {
-                setTickerWidth(width);
-              }
-            }}
-          >
-            <Text style={styles.tickerItem}>{tickerText}</Text>
-            <Text style={styles.tickerItem}>{tickerText}</Text>
-          </Animated.View>
-        </View>
-
         {/* Rewards Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1044,6 +1018,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </ScrollView>
 
+      {/* Ticker - Exact CodePen implementation - Outside ScrollView for fixed positioning */}
+      <View style={styles.tickerWrap}>
+        <Animated.View
+          style={[
+            styles.ticker,
+            {
+              transform: [
+                {
+                  translateX: tickerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
+                  }),
+                },
+              ],
+            },
+          ]}
+          onLayout={(event) => {
+            const { width } = event.nativeEvent.layout;
+            if (width > 0 && tickerWidth !== width) {
+              setTickerWidth(width);
+            }
+          }}
+        >
+          <Text style={styles.tickerItem}>{tickerText}</Text>
+          <Text style={styles.tickerItem}>{tickerText}</Text>
+        </Animated.View>
+      </View>
+
       {/* Bottom Navigation */}
       <BottomNavigation
         currentScreen={currentScreen}
@@ -1342,13 +1344,16 @@ const styles = StyleSheet.create({
   },
   // Ticker styles - Exact CodePen CSS conversion
   tickerWrap: {
-    position: 'absolute',
+    ...(Platform.OS === 'web' ? { position: 'fixed' as any } : { position: 'absolute' }),
     bottom: 0,
+    left: 0,
+    right: 0,
     width: '100%',
     overflow: 'hidden',
     height: 64, // 4rem = 64px
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes content off-screen right)
+    zIndex: 1000, // Ensure ticker is above other content
   },
   ticker: {
     flexDirection: 'row',
