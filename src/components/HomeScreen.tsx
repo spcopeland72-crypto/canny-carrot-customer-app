@@ -49,18 +49,8 @@ try {
   }
 }
 
-try {
-  bannerImage = require('../../assets/banner.png');
-  console.log('Banner loaded from assets');
-} catch (e) {
-  console.log('Banner not found in assets:', e);
-  try {
-    bannerImage = require('../../Images/Banner 1.png');
-    console.log('Banner loaded from Images folder');
-  } catch (e2) {
-    console.log('Banner not found anywhere:', e2);
-  }
-}
+// Banner image disabled - using green background instead
+let bannerImage: any = null;
 
 // Load Blackwells logo using same pattern as banner/logo
 let blackwellsLogo;
@@ -220,6 +210,15 @@ try {
 }
 
 // Load social media icons from Images folder - using static imports for Metro bundler
+// Load CC icon for banner logo
+let ccIconImage: any = null;
+try {
+  ccIconImage = require('../../assets/cc-icon-no-background.png');
+  console.log('[HomeScreen] CC icon loaded from assets');
+} catch (e) {
+  console.log('[HomeScreen] CC icon not found in assets:', e);
+}
+
 const facebookIcon = require('../../Images/facebook.png');
 const instagramIcon = require('../../Images/instagram.png');
 const tiktokIcon = require('../../Images/tiktok.png');
@@ -350,6 +349,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     x?: any;
     linkedin?: any;
   }>({});
+
+  // Set social media icons from module-level variables
+  useEffect(() => {
+    setSocialIcons({
+      facebook: facebookIcon,
+      instagram: instagramIcon,
+      tiktok: tiktokIcon,
+      x: xIcon,
+      linkedin: linkedinIcon,
+    });
+  }, []);
   const [currentGoldMemberImageIndex, setCurrentGoldMemberImageIndex] = useState(0);
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [redeemModalVisible, setRedeemModalVisible] = useState(false);
@@ -612,9 +622,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   </View>
                 </View>
                 <View style={styles.bannerLogoContainer}>
-                  <View style={styles.bannerLogoPlaceholder}>
-                    <Text style={styles.bannerLogoText}>Logo</Text>
-                  </View>
+                  {ccIconImage ? (
+                    <Image
+                      source={ccIconImage}
+                      style={styles.bannerLogoImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.bannerLogoPlaceholder}>
+                      <Text style={styles.bannerLogoText}>Logo</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -1331,13 +1349,13 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
     width: '100%',
-    height: 171, // Reduced by 5% from 180
+    height: 171,
   },
   banner: {
-    backgroundColor: Colors.secondary, // Orange background
+    backgroundColor: '#F69300', // Orange background - same as business app but different color
     paddingHorizontal: 20,
-    paddingVertical: 17, // Reduced by 5% from 18
-    minHeight: 128, // Reduced by 5% from 135
+    paddingVertical: 17,
+    minHeight: 128,
     justifyContent: 'center',
     width: '100%',
   },
@@ -1382,13 +1400,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bannerTitle: {
-    fontSize: 28, // Reduced by 5% from 29
+    fontSize: 28,
     fontWeight: 'bold',
     color: Colors.background,
     marginBottom: 4,
   },
   bannerSubtitle: {
-    fontSize: 21, // Reduced by 5% from 22
+    fontSize: 21,
     fontWeight: '600',
     color: Colors.background,
     marginBottom: 8,
@@ -1417,15 +1435,20 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   bannerLogoContainer: {
-    width: 103, // Reduced by 5% from 108
-    height: 103, // Reduced by 5% from 108
+    width: 103,
+    height: 103,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  bannerLogoImage: {
+    width: 103,
+    height: 103,
+    resizeMode: 'contain',
+  },
   bannerLogoPlaceholder: {
-    width: 103, // Reduced by 5% from 108
-    height: 103, // Reduced by 5% from 108
-    borderRadius: 51, // Reduced by 5% from 54
+    width: 103,
+    height: 103,
+    borderRadius: 51,
     backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
