@@ -307,7 +307,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       const startContinuousAnimation = () => {
         // Animate from current value to current + 1 (seamless continuation)
         const currentValue = tickerAnimation._value || 0;
-        const targetValue = currentValue + 1;
+        // const targetValue = currentValue + 1; // INCREMENT COMMENTED OUT
+        const targetValue = 1; // Just animate to 1, then repeat
         
         animationRef.current = Animated.timing(tickerAnimation, {
           toValue: targetValue,
