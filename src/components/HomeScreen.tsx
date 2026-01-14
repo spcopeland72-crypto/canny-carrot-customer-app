@@ -305,9 +305,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     if (tickerWidth > 0 && !animationRef.current) {
       // Create continuous animation that never resets
       const startContinuousAnimation = () => {
-        // Cycle 2: 1→0 (reset to 0 after reaching 1)
-        tickerAnimation.setValue(0); // Reset to 0 for each cycle
-        const targetValue = 1;
+        // Continue from current position - no reset
+        const currentValue = tickerAnimation._value || 0;
+        const targetValue = currentValue + 1; // Continue from where we are
         
         animationRef.current = Animated.timing(tickerAnimation, {
           toValue: targetValue,
@@ -318,7 +318,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         
         animationRef.current.start((finished) => {
           if (finished) {
-            // Cycle 2: Reset to 0, then start next cycle 0→1
+            // Continue from current position - no reset
             animationRef.current = null;
             startContinuousAnimation();
           }
