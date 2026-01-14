@@ -300,13 +300,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // CodePen: animation: ticker 30s linear infinite
+  // CodePen: animation: ticker 30s linear infinite - NO stop/reset, just continuous
   useEffect(() => {
-    if (tickerWidth > 0) {
-      if (animationRef.current) {
-        animationRef.current.stop();
-      }
-      tickerAnimation.setValue(0);
+    if (tickerWidth > 0 && !animationRef.current) {
       const duration = 30000; // CodePen: $duration: 30s
       animationRef.current = Animated.loop(
         Animated.timing(tickerAnimation, {
@@ -315,15 +311,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           easing: Easing.linear,
           useNativeDriver: Platform.OS !== 'web',
         }),
-        { iterations: -1 }
+        { iterations: -1 } // CodePen: infinite
       );
       animationRef.current.start();
     }
-    return () => {
-      if (animationRef.current) {
-        animationRef.current.stop();
-      }
-    };
   }, [tickerWidth]);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
