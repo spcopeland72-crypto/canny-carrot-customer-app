@@ -693,7 +693,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   {
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
+                      outputRange: tickerWidth > 0 
+                        ? [0, -tickerWidth] // Move by full measured width
+                        : [0, -(screenWidth * 3)], // Fallback: move by 3x screen width
                     }),
                   },
                 ],
@@ -701,13 +703,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onLayout={(event) => {
               const { width } = event.nativeEvent.layout;
+              console.log('[Ticker] Measured width:', width);
               if (width > 0 && tickerWidth !== width) {
                 setTickerWidth(width);
               }
             }}
           >
-            <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
-            <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
+            <Text style={styles.tickerItem} numberOfLines={1} ellipsizeMode="clip">{tickerText}</Text>
+            <Text style={styles.tickerItem} numberOfLines={1} ellipsizeMode="clip">{tickerText}</Text>
           </Animated.View>
         </View>
 
@@ -1343,30 +1346,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   // Ticker styles - Exact CodePen CSS conversion
-  // Ticker styles - Exact CodePen CSS conversion (adapted for React Native)
   tickerWrap: {
     width: '100%',
     overflow: 'hidden',
-    height: 32, // Reduced height to prevent text wrapping
-    backgroundColor: Colors.neutral[50], // White background, not black
+    height: 32,
+    backgroundColor: Colors.neutral[50],
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: Colors.neutral[200],
-    paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes content off-screen right)
+    paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes ticker element off-screen right)
     marginBottom: 24,
   },
   ticker: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 32,
-    paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text)
+    paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text for seamless loop)
   },
   tickerItem: {
-    paddingHorizontal: 16, // Reduced padding
-    fontSize: 12, // Smaller font to prevent wrapping and show full text
-    color: Colors.text.primary, // App text color
+    paddingHorizontal: 16,
+    fontSize: 12,
+    color: Colors.text.primary,
     includeFontPadding: false,
-    flexShrink: 0, // Prevent shrinking - ensures full text displays
+    flexShrink: 0,
+    // Text should render fully without truncation
   },
   bannerTextContainer: {
     flex: 1,
