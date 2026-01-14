@@ -1389,8 +1389,8 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     includeFontPadding: false,
     flexShrink: 0,
-    // Ensure full text renders - no constraints
-    minWidth: undefined,
+    // Ensure text renders at full width - no constraints
+    width: undefined,
     maxWidth: undefined,
   },
   bannerTextContainer: {
