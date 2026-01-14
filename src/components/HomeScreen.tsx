@@ -304,21 +304,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // Start animation when width is measured
+  // Start animation when width is measured - EXACT CodePen behavior
   const startTickerAnimation = (width: number) => {
     if (animationRef.current) {
       animationRef.current.stop();
     }
+    // CodePen: animation starts at translate3d(0, 0, 0) and moves to translate3d(-100%, 0, 0)
+    // -100% means -100% of the ticker element's OWN width (not screen width)
     tickerAnimation.setValue(0);
-    const duration = 30000; // 30 seconds as per CodePen
-    // useNativeDriver doesn't work on web, use false for web platform
+    const duration = 30000; // CodePen: 30s
     animationRef.current = Animated.loop(
       Animated.timing(tickerAnimation, {
         toValue: 1,
         duration: duration,
         easing: Easing.linear,
         useNativeDriver: Platform.OS !== 'web',
-      })
+      }),
+      { iterations: -1 } // Infinite loop - no reset
     );
     animationRef.current.start();
   };
