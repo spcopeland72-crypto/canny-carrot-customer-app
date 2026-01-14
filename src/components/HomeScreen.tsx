@@ -292,21 +292,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // EXACT CodePen - single string with seamless wrap
-  // CodePen uses two ticker__item but effect is one continuous string
+  // EXACT CodePen - continuous scroll, no reset
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const screenWidth = Dimensions.get('window').width || 375;
   const tickerAnimation = useRef(new Animated.Value(0)).current;
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // CodePen: animation: ticker 30s linear infinite
+  // CodePen: animation: ticker 30s linear infinite - start once, never reset
   useEffect(() => {
-    if (tickerWidth > 0) {
-      if (animationRef.current) {
-        animationRef.current.stop();
-      }
-      tickerAnimation.setValue(0);
+    if (tickerWidth > 0 && !animationRef.current) {
       const duration = 30000; // CodePen: $duration: 30s
       animationRef.current = Animated.loop(
         Animated.timing(tickerAnimation, {
@@ -322,6 +317,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => {
       if (animationRef.current) {
         animationRef.current.stop();
+        animationRef.current = null;
       }
     };
   }, [tickerWidth]);
@@ -704,7 +700,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: tickerWidth > 0 
-                        ? [0, -(tickerWidth + screenWidth)] // Move completely off left border, then loop
+                        ? [0, -tickerWidth] // CodePen: translate3d(-100%, 0, 0) = -100% of ticker width
                         : [0, 0],
                     }),
                   },
