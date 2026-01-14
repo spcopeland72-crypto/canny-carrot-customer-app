@@ -1349,19 +1349,25 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: 'hidden',
     zIndex: 1,
+    position: 'relative',
   },
   tickerWrapper: {
     overflow: 'hidden',
     height: 20,
     width: '100%',
+    position: 'relative',
   },
   tickerText: {
     fontSize: 12,
     color: Colors.text.primary,
     fontWeight: '500',
-    paddingHorizontal: 16,
+    paddingRight: 16, // Only right padding
+    paddingLeft: 0, // No left padding - starts at screen edge
     flexShrink: 0,
     includeFontPadding: false,
+    position: 'absolute',
+    right: 0, // Start at right edge of screen
+    top: 0,
     // Text rotates character-by-character: when "C" exits left, it appears on right
     // Each character moves left one position, first char wraps to end
   },
