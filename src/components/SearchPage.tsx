@@ -11,12 +11,14 @@ import {
   Platform,
   Linking,
   Image,
+  Modal,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
-import {discoveryApi, type Business, type Reward} from '../services/api';
+import {discoveryApi, rewardsApi, type Business, type Reward} from '../services/api';
 import {locationService, type Coordinates} from '../services/location';
 import {addOrUpdateBusiness} from '../utils/businessStorage';
+import {storage} from '../services/localStorage';
 
 interface SearchPageProps {
   currentScreen: string;
@@ -30,8 +32,30 @@ interface BusinessWithDistance extends Business {
   distanceFormatted?: string;
 }
 
+interface SearchResult {
+  type: 'business' | 'reward' | 'campaign';
+  business?: BusinessWithDistance;
+  reward?: Reward;
+  campaign?: any;
+}
+
+type SearchType = 'all' | 'businesses' | 'rewards' | 'campaigns';
+type SortOption = 'distance' | 'name' | 'relevance';
+type DistanceFilter = 'all' | '1km' | '5km' | '10km' | '25km';
+
 const SCREEN_WIDTH = Dimensions.get('window').width || 375;
 const SCREEN_HEIGHT = Dimensions.get('window').height || 667;
+
+const CATEGORIES = [
+  'All',
+  'Restaurant',
+  'Cafe',
+  'Retail',
+  'Beauty',
+  'Fitness',
+  'Entertainment',
+  'Other',
+];
 
 const SearchPage: React.FC<SearchPageProps> = ({
   currentScreen,
@@ -40,16 +64,30 @@ const SearchPage: React.FC<SearchPageProps> = ({
   onScanPress,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<SearchType>('all');
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('list');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
-  const [mapReady, setMapReady] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [distanceFilter, setDistanceFilter] = useState<DistanceFilter>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Request location permission and get user location
+  // Load search history
+  useEffect(() => {
+    loadSearchHistory();
+  }, []);
+
+  // Request location permission
   useEffect(() => {
     const initializeLocation = async () => {
       try {
@@ -68,157 +106,182 @@ const SearchPage: React.FC<SearchPageProps> = ({
     initializeLocation();
   }, []);
 
-  // Load nearby businesses when location is available
-  useEffect(() => {
-    if (userLocation && viewMode === 'map') {
-      loadNearbyBusinesses();
+  const loadSearchHistory = async () => {
+    try {
+      const history = await storage.get<string[]>('search_history');
+      if (history && Array.isArray(history)) {
+        setSearchHistory(history.slice(0, 10)); // Last 10 searches
+      }
+    } catch (err) {
+      console.error('Error loading search history:', err);
     }
-  }, [userLocation, viewMode]);
+  };
 
-  const loadNearbyBusinesses = async () => {
-    if (!userLocation) return;
+  const saveSearchHistory = async (query: string) => {
+    if (!query.trim()) return;
+    
+    try {
+      const history = await storage.get<string[]>('search_history') || [];
+      const updated = [query, ...history.filter(h => h !== query)].slice(0, 10);
+      await storage.set('search_history', updated);
+      setSearchHistory(updated);
+    } catch (err) {
+      console.error('Error saving search history:', err);
+    }
+  };
+
+  const performSearch = async (query: string) => {
+    if (!query.trim()) {
+      setResults([]);
+      setBusinesses([]);
+      setRewards([]);
+      setCampaigns([]);
+      return;
+    }
 
     setLoading(true);
     setError(null);
+    setShowHistory(false);
 
     try {
-      const result = await discoveryApi.findNearby({
-        lat: userLocation.latitude,
-        lng: userLocation.longitude,
-      });
+      const allResults: SearchResult[] = [];
 
-      if (result.success && result.data) {
-        let businessesList = result.data.map((business) => {
-          if (business.address?.latitude && business.address?.longitude) {
-            const distance = locationService.calculateDistance(
-              userLocation,
-              {
-                latitude: business.address.latitude,
-                longitude: business.address.longitude,
-              }
-            );
-            return {
-              ...business,
-              distance,
-              distanceFormatted: locationService.formatDistance(distance),
-            };
-          }
-          return business;
-        });
-
-        // Sort by distance
-        businessesList.sort((a, b) => {
-          const distA = (a as BusinessWithDistance).distance || Infinity;
-          const distB = (b as BusinessWithDistance).distance || Infinity;
-          return distA - distB;
-        });
-
-        setBusinesses(businessesList);
-
-        // Cache businesses
-        businessesList.forEach((business) => {
-          addOrUpdateBusiness({
-            id: business.id,
-            name: business.name,
-            address: business.address?.line1 || '',
-            phone: business.phone,
-            email: business.email,
-            website: business.website,
-            socialMedia: business.socialMedia,
-            createdAt: business.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+      // Search businesses
+      if (searchType === 'all' || searchType === 'businesses') {
+        const businessResult = await discoveryApi.search(query);
+        if (businessResult.success && businessResult.data) {
+          let businessesList = businessResult.data.map((business) => {
+            if (userLocation && business.address?.latitude && business.address?.longitude) {
+              const distance = locationService.calculateDistance(
+                userLocation,
+                {
+                  latitude: business.address.latitude,
+                  longitude: business.address.longitude,
+                }
+              );
+              return {
+                ...business,
+                distance,
+                distanceFormatted: locationService.formatDistance(distance),
+              };
+            }
+            return business;
           });
-        });
-      } else {
-        setError(result.error || 'Failed to load businesses');
+
+          // Apply distance filter
+          if (distanceFilter !== 'all' && userLocation) {
+            const maxDistance = parseFloat(distanceFilter.replace('km', '')) * 1000;
+            businessesList = businessesList.filter(b => 
+              (b as BusinessWithDistance).distance !== undefined && 
+              (b as BusinessWithDistance).distance! <= maxDistance
+            );
+          }
+
+          // Apply category filter
+          if (selectedCategory !== 'All') {
+            businessesList = businessesList.filter(b => b.category === selectedCategory);
+          }
+
+          // Sort businesses
+          businessesList = sortBusinesses(businessesList, sortBy);
+
+          setBusinesses(businessesList);
+          businessesList.forEach(b => {
+            allResults.push({ type: 'business', business: b });
+          });
+        }
       }
+
+      // Search rewards (through businesses)
+      if (searchType === 'all' || searchType === 'rewards') {
+        // Get all businesses first, then search their rewards
+        const businessResult = await discoveryApi.search(query);
+        if (businessResult.success && businessResult.data) {
+          const rewardsList: Reward[] = [];
+          
+          for (const business of businessResult.data.slice(0, 10)) {
+            try {
+              const rewardResult = await rewardsApi.getAvailableRewards(business.id);
+              if (rewardResult.success && rewardResult.data) {
+                const matchingRewards = rewardResult.data.filter(r =>
+                  r.name.toLowerCase().includes(query.toLowerCase()) ||
+                  r.description?.toLowerCase().includes(query.toLowerCase())
+                );
+                rewardsList.push(...matchingRewards.map(r => ({ ...r, businessId: business.id })));
+              }
+            } catch (err) {
+              // Skip if business rewards fail
+            }
+          }
+
+          setRewards(rewardsList);
+          rewardsList.forEach(r => {
+            allResults.push({ type: 'reward', reward: r });
+          });
+        }
+      }
+
+      // Search campaigns (placeholder - would need campaign API)
+      if (searchType === 'all' || searchType === 'campaigns') {
+        // Campaign search would go here when API is available
+        setCampaigns([]);
+      }
+
+      setResults(allResults);
+      await saveSearchHistory(query);
     } catch (err) {
-      console.error('Error loading businesses:', err);
-      setError('Failed to load businesses. Please try again.');
+      console.error('Search error:', err);
+      setError('Search failed. Please try again.');
+      setResults([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sortBusinesses = (list: BusinessWithDistance[], sort: SortOption): BusinessWithDistance[] => {
+    const sorted = [...list];
+    
+    switch (sort) {
+      case 'distance':
+        return sorted.sort((a, b) => {
+          const distA = a.distance || Infinity;
+          const distB = b.distance || Infinity;
+          return distA - distB;
+        });
+      case 'name':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'relevance':
+      default:
+        return sorted; // Keep original order (relevance from API)
     }
   };
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
 
-    // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // If query is empty, load nearby businesses
     if (!query.trim()) {
-      if (userLocation) {
-        loadNearbyBusinesses();
-      } else {
-        setBusinesses([]);
-      }
+      setResults([]);
+      setBusinesses([]);
+      setRewards([]);
+      setCampaigns([]);
+      setShowHistory(true);
       return;
     }
 
-    // Debounce search - wait 500ms after user stops typing
-    searchTimeoutRef.current = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await discoveryApi.search(query);
-        if (result.success && result.data) {
-          let businessesList = result.data;
-
-          // Calculate distances if user location is available
-          if (userLocation) {
-            businessesList = businessesList.map((business) => {
-              if (business.address?.latitude && business.address?.longitude) {
-                const distance = locationService.calculateDistance(
-                  userLocation,
-                  {
-                    latitude: business.address.latitude,
-                    longitude: business.address.longitude,
-                  }
-                );
-                return {
-                  ...business,
-                  distance,
-                  distanceFormatted: locationService.formatDistance(distance),
-                };
-              }
-              return business;
-            });
-
-            // Sort by distance
-            businessesList.sort((a, b) => {
-              const distA = (a as BusinessWithDistance).distance || Infinity;
-              const distB = (b as BusinessWithDistance).distance || Infinity;
-              return distA - distB;
-            });
-          }
-
-          setBusinesses(businessesList);
-        } else {
-          setError(result.error || 'Search failed');
-          setBusinesses([]);
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-        setError('Search failed. Please try again.');
-        setBusinesses([]);
-      } finally {
-        setLoading(false);
-      }
+    // Debounce search
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(query);
     }, 500);
   };
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+  const handleSearchHistoryClick = (query: string) => {
+    setSearchQuery(query);
+    performSearch(query);
+  };
 
   const handleGetDirections = (business: Business) => {
     if (!business.address?.latitude || !business.address?.longitude) {
@@ -237,17 +300,143 @@ const SearchPage: React.FC<SearchPageProps> = ({
   };
 
   const openGoogleMaps = () => {
-    if (!userLocation) {
-      return;
-    }
-
+    if (!userLocation) return;
     const url = `https://www.google.com/maps/search/?api=1&query=${userLocation.latitude},${userLocation.longitude}`;
     Linking.openURL(url).catch((err) => {
       console.error('Error opening Google Maps:', err);
     });
   };
 
-  // Render map view (Google Maps integration)
+  // Render search filters
+  const renderFilters = () => {
+    if (!showFilters) return null;
+
+    return (
+      <View style={styles.filtersContainer}>
+        {/* Search Type Tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+          {(['all', 'businesses', 'rewards', 'campaigns'] as SearchType[]).map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterChip,
+                searchType === type ? styles.filterChipActive : null,
+              ]}
+              onPress={() => setSearchType(type)}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  searchType === type ? styles.filterChipTextActive : null,
+                ]}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Category Filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+          {CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.filterChip,
+                selectedCategory === category ? styles.filterChipActive : null,
+              ]}
+              onPress={() => {
+                setSelectedCategory(category);
+                if (searchQuery) performSearch(searchQuery);
+              }}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedCategory === category ? styles.filterChipTextActive : null,
+                ]}>
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Distance Filter */}
+        {userLocation && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            <Text style={styles.filterLabel}>Distance:</Text>
+            {(['all', '1km', '5km', '10km', '25km'] as DistanceFilter[]).map((distance) => (
+              <TouchableOpacity
+                key={distance}
+                style={[
+                  styles.filterChip,
+                  distanceFilter === distance ? styles.filterChipActive : null,
+                ]}
+                onPress={() => {
+                  setDistanceFilter(distance);
+                  if (searchQuery) performSearch(searchQuery);
+                }}>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    distanceFilter === distance ? styles.filterChipTextActive : null,
+                  ]}>
+                  {distance === 'all' ? 'All' : distance}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Sort Options */}
+        <View style={styles.sortRow}>
+          <Text style={styles.filterLabel}>Sort by:</Text>
+          {(['relevance', 'distance', 'name'] as SortOption[]).map((sort) => (
+            <TouchableOpacity
+              key={sort}
+              style={[
+                styles.filterChip,
+                sortBy === sort ? styles.filterChipActive : null,
+              ]}
+              onPress={() => {
+                setSortBy(sort);
+                if (searchQuery) {
+                  const sorted = sortBusinesses(businesses, sort);
+                  setBusinesses(sorted);
+                }
+              }}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  sortBy === sort ? styles.filterChipTextActive : null,
+                ]}>
+                {sort.charAt(0).toUpperCase() + sort.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // Render search history
+  const renderSearchHistory = () => {
+    if (!showHistory || searchHistory.length === 0) return null;
+
+    return (
+      <View style={styles.historyContainer}>
+        <Text style={styles.historyTitle}>Recent Searches</Text>
+        {searchHistory.map((query, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.historyItem}
+            onPress={() => handleSearchHistoryClick(query)}>
+            <Text style={styles.historyIcon}>🕐</Text>
+            <Text style={styles.historyText}>{query}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  // Render map view
   const renderMapView = () => {
     return (
       <View style={styles.mapContainer}>
@@ -260,12 +449,8 @@ const SearchPage: React.FC<SearchPageProps> = ({
           </Text>
           {userLocation && (
             <>
-              <Text style={styles.mapCoordinates}>
-                Your location: {userLocation.latitude.toFixed(4)},{' '}
-                {userLocation.longitude.toFixed(4)}
-              </Text>
               <Text style={styles.businessCount}>
-                {businesses.length} businesses nearby
+                {businesses.length} businesses found
               </Text>
               <TouchableOpacity
                 style={styles.openMapsButton}
@@ -276,26 +461,9 @@ const SearchPage: React.FC<SearchPageProps> = ({
               </TouchableOpacity>
             </>
           )}
-          {!userLocation && (
-            <TouchableOpacity
-              style={styles.enableLocationButton}
-              onPress={async () => {
-                const hasPermission = await locationService.requestPermission();
-                if (hasPermission) {
-                  const location = await locationService.getCurrentLocation();
-                  if (location) {
-                    setUserLocation(location.coords);
-                  }
-                }
-              }}>
-              <Text style={styles.enableLocationButtonText}>
-                Enable Location
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {/* Business markers overlay (simulated) */}
+        {/* Business markers overlay */}
         {userLocation && businesses.length > 0 && (
           <View style={styles.markersOverlay}>
             <ScrollView
@@ -310,9 +478,9 @@ const SearchPage: React.FC<SearchPageProps> = ({
                   <Text style={styles.markerName} numberOfLines={1}>
                     {business.name}
                   </Text>
-                  {(business as BusinessWithDistance).distanceFormatted && (
+                  {business.distanceFormatted && (
                     <Text style={styles.markerDistance}>
-                      {(business as BusinessWithDistance).distanceFormatted}
+                      {business.distanceFormatted}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -330,7 +498,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
       return (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>Searching...</Text>
         </View>
       );
     }
@@ -341,79 +509,159 @@ const SearchPage: React.FC<SearchPageProps> = ({
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => {
-              if (searchQuery) {
-                handleSearch(searchQuery);
-              } else {
-                loadNearbyBusinesses();
-              }
-            }}>
+            onPress={() => performSearch(searchQuery)}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (businesses.length === 0) {
+    if (!searchQuery.trim()) {
       return (
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No businesses found</Text>
+          <Text style={styles.emptyText}>Start searching...</Text>
           <Text style={styles.emptySubtext}>
-            {searchQuery
-              ? 'Try a different search term'
-              : 'Enable location to find nearby businesses'}
+            Search for businesses, rewards, or campaigns
+          </Text>
+          {renderSearchHistory()}
+        </View>
+      );
+    }
+
+    if (results.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>No results found</Text>
+          <Text style={styles.emptySubtext}>
+            Try a different search term or adjust filters
           </Text>
         </View>
       );
     }
 
     return (
-      <ScrollView style={styles.businessList} showsVerticalScrollIndicator={false}>
-        {businesses.map((business) => (
-          <TouchableOpacity
-            key={business.id}
-            style={styles.businessCard}
-            onPress={() => setSelectedBusiness(business)}>
-            <View style={styles.businessCardContent}>
-              {business.logo && (
-                <Image
-                  source={{uri: business.logo}}
-                  style={styles.businessLogo}
-                  resizeMode="cover"
-                />
-              )}
-              <View style={styles.businessInfo}>
-                <Text style={styles.businessName}>{business.name}</Text>
-                {business.category && (
-                  <Text style={styles.businessCategory}>{business.category}</Text>
-                )}
-                {business.address && (
-                  <Text style={styles.businessAddress} numberOfLines={2}>
-                    {business.address.line1}
-                    {business.address.city && `, ${business.address.city}`}
-                  </Text>
-                )}
-                {(business as BusinessWithDistance).distanceFormatted && (
-                  <Text style={styles.businessDistance}>
-                    📍 {(business as BusinessWithDistance).distanceFormatted} away
-                  </Text>
-                )}
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.directionsButton}
-              onPress={() => handleGetDirections(business)}>
-              <Text style={styles.directionsButtonText}>Directions</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ))}
+      <ScrollView style={styles.resultsList} showsVerticalScrollIndicator={false}>
+        {/* Businesses */}
+        {businesses.length > 0 && (
+          <View style={styles.resultsSection}>
+            <Text style={styles.sectionTitle}>Businesses ({businesses.length})</Text>
+            {businesses.map((business) => (
+              <TouchableOpacity
+                key={business.id}
+                style={styles.resultCard}
+                onPress={() => setSelectedBusiness(business)}>
+                <View style={styles.resultCardContent}>
+                  {business.logo && (
+                    <Image
+                      source={{uri: business.logo}}
+                      style={styles.resultLogo}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.resultInfo}>
+                    <Text style={styles.resultName}>{business.name}</Text>
+                    {business.category && (
+                      <Text style={styles.resultCategory}>{business.category}</Text>
+                    )}
+                    {business.address && (
+                      <Text style={styles.resultAddress} numberOfLines={2}>
+                        {business.address.line1}
+                        {business.address.city && `, ${business.address.city}`}
+                      </Text>
+                    )}
+                    {business.distanceFormatted && (
+                      <Text style={styles.resultDistance}>
+                        📍 {business.distanceFormatted} away
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.directionsButton}
+                  onPress={() => handleGetDirections(business)}>
+                  <Text style={styles.directionsButtonText}>Directions</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Rewards */}
+        {rewards.length > 0 && (
+          <View style={styles.resultsSection}>
+            <Text style={styles.sectionTitle}>Rewards ({rewards.length})</Text>
+            {rewards.map((reward) => (
+              <TouchableOpacity
+                key={reward.id}
+                style={styles.resultCard}
+                onPress={() => {
+                  // Navigate to reward detail or business
+                  if (reward.businessId) {
+                    onNavigate(`Business${reward.businessId}`);
+                  }
+                }}>
+                <View style={styles.resultCardContent}>
+                  <View style={styles.rewardIcon}>
+                    <Text style={styles.rewardIconText}>🎁</Text>
+                  </View>
+                  <View style={styles.resultInfo}>
+                    <Text style={styles.resultName}>{reward.name}</Text>
+                    {reward.description && (
+                      <Text style={styles.resultDescription} numberOfLines={2}>
+                        {reward.description}
+                      </Text>
+                    )}
+                    <Text style={styles.rewardRequirement}>
+                      {reward.stampsRequired} stamps required
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Campaigns */}
+        {campaigns.length > 0 && (
+          <View style={styles.resultsSection}>
+            <Text style={styles.sectionTitle}>Campaigns ({campaigns.length})</Text>
+            {campaigns.map((campaign) => (
+              <TouchableOpacity
+                key={campaign.id}
+                style={styles.resultCard}>
+                <View style={styles.resultCardContent}>
+                  <View style={styles.rewardIcon}>
+                    <Text style={styles.rewardIconText}>🎯</Text>
+                  </View>
+                  <View style={styles.resultInfo}>
+                    <Text style={styles.resultName}>{campaign.name}</Text>
+                    {campaign.description && (
+                      <Text style={styles.resultDescription} numberOfLines={2}>
+                        {campaign.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
     );
   };
 
+  // Cleanup timeout
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <PageTemplate
-      title="Search & Map"
+      title="Search"
       currentScreen={currentScreen}
       onNavigate={onNavigate}
       onBack={onBack}
@@ -425,39 +673,33 @@ const SearchPage: React.FC<SearchPageProps> = ({
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search businesses, rewards..."
+              placeholder="Search businesses, rewards, campaigns..."
               placeholderTextColor={Colors.text.light}
               value={searchQuery}
               onChangeText={handleSearch}
               returnKeyType="search"
               onSubmitEditing={() => {
-                // Trigger search immediately on submit
                 if (searchQuery.trim()) {
-                  handleSearch(searchQuery);
+                  performSearch(searchQuery);
                 }
               }}
+              onFocus={() => setShowHistory(true)}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            <TouchableOpacity
+              style={styles.filterToggleButton}
+              onPress={() => setShowFilters(!showFilters)}>
+              <Text style={styles.filterToggleText}>⚙️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
+        {/* Filters */}
+        {renderFilters()}
+
         {/* View Toggle */}
         <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[
-              styles.viewToggleButton,
-              viewMode === 'map' ? styles.viewToggleButtonActive : null,
-            ]}
-            onPress={() => setViewMode('map')}>
-            <Text
-              style={[
-                styles.viewToggleText,
-                viewMode === 'map' ? styles.viewToggleTextActive : null,
-              ]}>
-              Map
-            </Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.viewToggleButton,
@@ -472,6 +714,20 @@ const SearchPage: React.FC<SearchPageProps> = ({
               List
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.viewToggleButton,
+              viewMode === 'map' ? styles.viewToggleButtonActive : null,
+            ]}
+            onPress={() => setViewMode('map')}>
+            <Text
+              style={[
+                styles.viewToggleText,
+                viewMode === 'map' ? styles.viewToggleTextActive : null,
+              ]}>
+              Map
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Content */}
@@ -479,47 +735,53 @@ const SearchPage: React.FC<SearchPageProps> = ({
 
         {/* Business Details Modal */}
         {selectedBusiness && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{selectedBusiness.name}</Text>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedBusiness(null)}>
-                  <Text style={styles.modalCloseText}>×</Text>
-                </TouchableOpacity>
-              </View>
+          <Modal
+            visible={!!selectedBusiness}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setSelectedBusiness(null)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{selectedBusiness.name}</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setSelectedBusiness(null)}>
+                    <Text style={styles.modalCloseText}>×</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <ScrollView style={styles.modalBody}>
-                {selectedBusiness.description && (
-                  <Text style={styles.modalDescription}>
-                    {selectedBusiness.description}
-                  </Text>
-                )}
-
-                {selectedBusiness.address && (
-                  <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Address</Text>
-                    <Text style={styles.modalSectionText}>
-                      {selectedBusiness.address.line1}
-                      {selectedBusiness.address.line2 && `, ${selectedBusiness.address.line2}`}
-                      {selectedBusiness.address.city && `, ${selectedBusiness.address.city}`}
-                      {selectedBusiness.address.postcode && ` ${selectedBusiness.address.postcode}`}
+                <ScrollView style={styles.modalBody}>
+                  {selectedBusiness.description && (
+                    <Text style={styles.modalDescription}>
+                      {selectedBusiness.description}
                     </Text>
-                  </View>
-                )}
+                  )}
 
-                <TouchableOpacity
-                  style={styles.modalActionButton}
-                  onPress={() => {
-                    handleGetDirections(selectedBusiness);
-                    setSelectedBusiness(null);
-                  }}>
-                  <Text style={styles.modalActionButtonText}>Get Directions</Text>
-                </TouchableOpacity>
-              </ScrollView>
+                  {selectedBusiness.address && (
+                    <View style={styles.modalSection}>
+                      <Text style={styles.modalSectionTitle}>Address</Text>
+                      <Text style={styles.modalSectionText}>
+                        {selectedBusiness.address.line1}
+                        {selectedBusiness.address.line2 && `, ${selectedBusiness.address.line2}`}
+                        {selectedBusiness.address.city && `, ${selectedBusiness.address.city}`}
+                        {selectedBusiness.address.postcode && ` ${selectedBusiness.address.postcode}`}
+                      </Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.modalActionButton}
+                    onPress={() => {
+                      handleGetDirections(selectedBusiness);
+                      setSelectedBusiness(null);
+                    }}>
+                    <Text style={styles.modalActionButtonText}>Get Directions</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
             </View>
-          </View>
+          </Modal>
         )}
       </View>
     </PageTemplate>
@@ -554,6 +816,83 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: Colors.text.primary,
+  },
+  filterToggleButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  filterToggleText: {
+    fontSize: 20,
+  },
+  filtersContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.neutral[50],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  filterRow: {
+    marginBottom: 8,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginRight: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.background,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterChipText: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: Colors.background,
+  },
+  historyContainer: {
+    padding: 16,
+    backgroundColor: Colors.neutral[50],
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  historyIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  historyText: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    flex: 1,
   },
   viewToggle: {
     flexDirection: 'row',
@@ -606,11 +945,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  mapCoordinates: {
-    fontSize: 12,
-    color: Colors.text.light,
-    marginBottom: 8,
-  },
   businessCount: {
     fontSize: 14,
     color: Colors.text.primary,
@@ -622,21 +956,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 8,
   },
   openMapsButtonText: {
-    color: Colors.background,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  enableLocationButton: {
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  enableLocationButtonText: {
     color: Colors.background,
     fontSize: 16,
     fontWeight: '600',
@@ -675,11 +996,20 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '600',
   },
-  businessList: {
+  resultsList: {
     flex: 1,
     paddingHorizontal: 16,
   },
-  businessCard: {
+  resultsSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  resultCard: {
     backgroundColor: Colors.background,
     borderRadius: 12,
     padding: 16,
@@ -692,39 +1022,61 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  businessCardContent: {
+  resultCardContent: {
     flexDirection: 'row',
     marginBottom: 12,
   },
-  businessLogo: {
+  resultLogo: {
     width: 60,
     height: 60,
     borderRadius: 8,
     marginRight: 12,
     backgroundColor: Colors.neutral[100],
   },
-  businessInfo: {
+  rewardIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rewardIconText: {
+    fontSize: 32,
+  },
+  resultInfo: {
     flex: 1,
   },
-  businessName: {
+  resultName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.text.primary,
     marginBottom: 4,
   },
-  businessCategory: {
+  resultCategory: {
     fontSize: 12,
     color: Colors.primary,
     fontWeight: '600',
     marginBottom: 4,
     textTransform: 'uppercase',
   },
-  businessAddress: {
+  resultAddress: {
     fontSize: 14,
     color: Colors.text.secondary,
     marginBottom: 4,
   },
-  businessDistance: {
+  resultDistance: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  resultDescription: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginBottom: 4,
+  },
+  rewardRequirement: {
     fontSize: 12,
     color: Colors.primary,
     fontWeight: '600',
@@ -781,15 +1133,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: Colors.background,

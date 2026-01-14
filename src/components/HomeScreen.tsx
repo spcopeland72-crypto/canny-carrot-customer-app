@@ -292,43 +292,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // Ticker animation - continuous scrolling where each letter reappears on right as it leaves left
+  // Ticker animation - seamless continuous scroll where each letter wraps from left to right
   const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
-  const spacing = "          "; // 10 spaces
-  // Create multiple copies for seamless continuous scrolling
-  // Pattern: text + spacing repeated multiple times
-  // As one copy exits left, the next enters from right seamlessly
-  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}${tickerText}${spacing}`;
+  const spacing = "          "; // 10 spaces for gap between repetitions
+  // Create seamless loop: text + spacing + text + spacing
+  // When first instance scrolls completely off left, second instance is already visible
+  // Animation loops back to start position seamlessly
+  const tickerContent = `${tickerText}${spacing}${tickerText}${spacing}`;
   
   useEffect(() => {
     const screenWidth = Dimensions.get('window').width;
-    // More accurate text width calculation for 12px font
-    // Average character width is approximately 6.5px for most fonts at 12px
-    const textWidth = tickerText.length * 6.5;
-    const spacingWidth = spacing.length * 6.5; // Spacing width
+    // Calculate width of one complete instance (text + spacing)
+    // Using more accurate measurement: 12px font ≈ 6.2px average char width
+    const textWidth = tickerText.length * 6.2;
+    const spacingWidth = spacing.length * 6.2;
     const singleInstanceWidth = textWidth + spacingWidth;
     
-    // Calculate total content width needed (2 full instances for seamless loop)
-    const totalContentWidth = singleInstanceWidth * 2;
-    
-    // Start from 0 (text visible, ready to scroll)
-    // Animate to -singleInstanceWidth (one full instance scrolls off left)
-    // When animation loops back to 0, the duplicate copy is already positioned to seamlessly continue
-    // This creates the effect where each letter reappears on right as it leaves left
+    // Start animation from 0
     tickerAnim.setValue(0);
     
+    // Create infinite loop animation
+    // Animates from 0 to -singleInstanceWidth (one full instance scrolls left)
+    // When it loops back to 0, the second copy is perfectly positioned to continue seamlessly
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
         toValue: -singleInstanceWidth,
-        duration: 20000, // Slower for better readability
-        easing: Easing.linear,
+        duration: 25000, // Smooth scrolling speed
+        easing: Easing.linear, // Linear for constant speed
         useNativeDriver: true,
       }),
       { iterations: -1 } // Infinite loop
     );
+    
     animation.start();
-    return () => animation.stop();
+    
+    return () => {
+      animation.stop();
+    };
   }, []);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
@@ -680,7 +681,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Ticker */}
         <View style={styles.tickerContainer}>
-          <View style={styles.tickerWrapper}>
+          <View style={styles.tickerWrapper} collapsable={false}>
             <Animated.View 
               style={[
                 styles.tickerContent, 
@@ -688,6 +689,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   transform: [{translateX: tickerAnim}],
                 }
               ]}
+              collapsable={false}
             >
               <Text style={styles.tickerText} numberOfLines={1}>{tickerContent}</Text>
             </Animated.View>
@@ -1338,10 +1340,12 @@ const styles = StyleSheet.create({
   tickerWrapper: {
     overflow: 'hidden',
     height: 20,
+    width: '100%',
   },
   tickerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '200%', // Ensure enough width for seamless loop
   },
   tickerText: {
     fontSize: 12,
@@ -1350,6 +1354,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexShrink: 0,
     includeFontPadding: false,
+    whiteSpace: 'nowrap',
   },
   bannerTextContainer: {
     flex: 1,
