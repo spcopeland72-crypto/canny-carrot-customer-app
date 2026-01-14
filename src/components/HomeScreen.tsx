@@ -703,9 +703,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onLayout={(event) => {
               const { width } = event.nativeEvent.layout;
-              console.log('[Ticker] Measured width:', width);
+              console.log('[Ticker] Measured width:', width, 'Screen width:', screenWidth);
+              console.log('[Ticker] Text length:', tickerText.length);
               if (width > 0 && tickerWidth !== width) {
                 setTickerWidth(width);
+                console.log('[Ticker] Animation will move from 0 to', -width);
               }
             }}
           >
@@ -1362,6 +1364,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 32,
     paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text for seamless loop)
+    // Ensure content doesn't get clipped
+    minWidth: '100%',
   },
   tickerItem: {
     paddingHorizontal: 16,
@@ -1369,7 +1373,9 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     includeFontPadding: false,
     flexShrink: 0,
-    // Text should render fully without truncation
+    // Ensure full text renders - no constraints
+    minWidth: undefined,
+    maxWidth: undefined,
   },
   bannerTextContainer: {
     flex: 1,
