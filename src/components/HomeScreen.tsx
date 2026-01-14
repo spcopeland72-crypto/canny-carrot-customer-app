@@ -300,18 +300,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // CodePen: animation: ticker 30s linear infinite - NO stop/reset, just continuous
+  // Permanent continuous loop - no timer, no reset
   useEffect(() => {
     if (tickerWidth > 0 && !animationRef.current) {
-      const duration = 30000; // CodePen: $duration: 30s
+      // const duration = 30000; // TIMER COMMENTED OUT
       animationRef.current = Animated.loop(
         Animated.timing(tickerAnimation, {
           toValue: 1,
-          duration: duration,
+          duration: 30000, // Keep duration for animation speed, but loop is permanent
           easing: Easing.linear,
           useNativeDriver: Platform.OS !== 'web',
         }),
-        { iterations: -1 } // CodePen: infinite
+        { iterations: -1 } // Permanent infinite loop
       );
       animationRef.current.start();
     }
