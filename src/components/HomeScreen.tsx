@@ -1349,27 +1349,27 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: 'hidden',
     zIndex: 1,
-    position: 'relative',
   },
   tickerWrapper: {
     overflow: 'hidden',
     height: 20,
     width: '100%',
-    position: 'relative',
+    flexDirection: 'row',
+    justifyContent: 'flex-end', // Align text to right edge
+    alignItems: 'center',
   },
   tickerText: {
     fontSize: 12,
     color: Colors.text.primary,
     fontWeight: '500',
-    paddingRight: 16, // Only right padding
+    paddingRight: 16, // Padding from right edge
     paddingLeft: 0, // No left padding - starts at screen edge
     flexShrink: 0,
     includeFontPadding: false,
-    position: 'absolute',
-    right: 0, // Start at right edge of screen
-    top: 0,
+    textAlign: 'left', // Text flows left from right edge
     // Text rotates character-by-character: when "C" exits left, it appears on right
     // Each character moves left one position, first char wraps to end
+    // Text starts at right border of screen, scrolls left
   },
   bannerTextContainer: {
     flex: 1,
