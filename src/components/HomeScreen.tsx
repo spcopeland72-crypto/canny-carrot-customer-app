@@ -1392,6 +1392,7 @@ const styles = StyleSheet.create({
     color: 'white', // CodePen: color: white
     includeFontPadding: false,
     flexShrink: 0,
+    // Ensure text renders fully - no width constraints
   },
   bannerTextContainer: {
     flex: 1,
