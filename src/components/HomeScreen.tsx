@@ -292,11 +292,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // Ticker animation - Exact CodePen implementation
-  // CSS: padding-left: 100% pushes content off-screen right
-  // CSS: padding-right: 100% adds space after text  
-  // CSS: translate3d(-100%, 0, 0) animates by -100% of element width
-  // Text is duplicated for seamless loop
+  // EXACT CodePen ticker - NO MODIFICATIONS
+  // CodePen: padding-left: 100% pushes ticker off-screen right
+  // CodePen: padding-right: 100% adds space after text
+  // CodePen: translate3d(-100%, 0, 0) moves by -100% of ticker element's width
+  // CodePen: Two ticker__item spans with same text for seamless wrap
   
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const screenWidth = Dimensions.get('window').width || 375;
@@ -304,31 +304,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [tickerWidth, setTickerWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // Start animation when width is measured - EXACT CodePen behavior
-  const startTickerAnimation = (width: number) => {
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-    // CodePen: animation starts at translate3d(0, 0, 0) and moves to translate3d(-100%, 0, 0)
-    // -100% means -100% of the ticker element's OWN width (not screen width)
-    tickerAnimation.setValue(0);
-    const duration = 30000; // CodePen: 30s
-    animationRef.current = Animated.loop(
-      Animated.timing(tickerAnimation, {
-        toValue: 1,
-        duration: duration,
-        easing: Easing.linear,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      { iterations: -1 } // Infinite loop - no reset
-    );
-    animationRef.current.start();
-  };
-  
-  // Start animation when width is available
+  // CodePen: animation: ticker 30s linear infinite
   useEffect(() => {
     if (tickerWidth > 0) {
-      startTickerAnimation(tickerWidth);
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+      tickerAnimation.setValue(0);
+      const duration = 30000; // CodePen: $duration: 30s
+      animationRef.current = Animated.loop(
+        Animated.timing(tickerAnimation, {
+          toValue: 1,
+          duration: duration,
+          easing: Easing.linear, // CodePen: linear
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        { iterations: -1 } // CodePen: infinite
+      );
+      animationRef.current.start();
     }
     return () => {
       if (animationRef.current) {
