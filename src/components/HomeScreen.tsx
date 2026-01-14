@@ -729,8 +729,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               }
             }}
           >
-            <Text style={styles.tickerItem}>{tickerText}</Text>
-            <Text style={styles.tickerItem}>{tickerText}</Text>
+            <Text style={styles.tickerItem}>
+              {tickerText}{'          '}{tickerText}
+            </Text>
           </Animated.View>
         </View>
 
