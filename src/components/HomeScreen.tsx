@@ -303,10 +303,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   
   useEffect(() => {
     const screenWidth = Dimensions.get('window').width;
-    // Estimate text width (approximate: 7px per character for 12px font)
-    const textWidth = tickerText.length * 7;
-    const spacingWidth = 10 * 7; // 10 spaces
+    // More accurate text width calculation for 12px font
+    // Average character width is approximately 6.5px for most fonts at 12px
+    const textWidth = tickerText.length * 6.5;
+    const spacingWidth = spacing.length * 6.5; // Spacing width
     const singleInstanceWidth = textWidth + spacingWidth;
+    
+    // Calculate total content width needed (2 full instances for seamless loop)
+    const totalContentWidth = singleInstanceWidth * 2;
     
     // Start from 0 (text visible, ready to scroll)
     // Animate to -singleInstanceWidth (one full instance scrolls off left)
@@ -317,7 +321,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     const animation = Animated.loop(
       Animated.timing(tickerAnim, {
         toValue: -singleInstanceWidth,
-        duration: 15000,
+        duration: 20000, // Slower for better readability
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -682,7 +686,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 styles.tickerContent, 
                 {
                   transform: [{translateX: tickerAnim}],
-                  width: '200%', // Ensure content is wide enough for duplicates
                 }
               ]}
             >
@@ -1339,7 +1342,6 @@ const styles = StyleSheet.create({
   tickerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    whiteSpace: 'nowrap',
   },
   tickerText: {
     fontSize: 12,
@@ -1347,6 +1349,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     paddingHorizontal: 16,
     flexShrink: 0,
+    includeFontPadding: false,
   },
   bannerTextContainer: {
     flex: 1,

@@ -47,6 +47,7 @@ const SearchPage: React.FC<SearchPageProps> = ({
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Request location permission and get user location
   useEffect(() => {
@@ -142,60 +143,82 @@ const SearchPage: React.FC<SearchPageProps> = ({
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
 
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If query is empty, load nearby businesses
     if (!query.trim()) {
       if (userLocation) {
         loadNearbyBusinesses();
+      } else {
+        setBusinesses([]);
       }
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    // Debounce search - wait 500ms after user stops typing
+    searchTimeoutRef.current = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const result = await discoveryApi.search(query);
-      if (result.success && result.data) {
-        let businessesList = result.data;
+      try {
+        const result = await discoveryApi.search(query);
+        if (result.success && result.data) {
+          let businessesList = result.data;
 
-        // Calculate distances if user location is available
-        if (userLocation) {
-          businessesList = businessesList.map((business) => {
-            if (business.address?.latitude && business.address?.longitude) {
-              const distance = locationService.calculateDistance(
-                userLocation,
-                {
-                  latitude: business.address.latitude,
-                  longitude: business.address.longitude,
-                }
-              );
-              return {
-                ...business,
-                distance,
-                distanceFormatted: locationService.formatDistance(distance),
-              };
-            }
-            return business;
-          });
+          // Calculate distances if user location is available
+          if (userLocation) {
+            businessesList = businessesList.map((business) => {
+              if (business.address?.latitude && business.address?.longitude) {
+                const distance = locationService.calculateDistance(
+                  userLocation,
+                  {
+                    latitude: business.address.latitude,
+                    longitude: business.address.longitude,
+                  }
+                );
+                return {
+                  ...business,
+                  distance,
+                  distanceFormatted: locationService.formatDistance(distance),
+                };
+              }
+              return business;
+            });
 
-          // Sort by distance
-          businessesList.sort((a, b) => {
-            const distA = (a as BusinessWithDistance).distance || Infinity;
-            const distB = (b as BusinessWithDistance).distance || Infinity;
-            return distA - distB;
-          });
+            // Sort by distance
+            businessesList.sort((a, b) => {
+              const distA = (a as BusinessWithDistance).distance || Infinity;
+              const distB = (b as BusinessWithDistance).distance || Infinity;
+              return distA - distB;
+            });
+          }
+
+          setBusinesses(businessesList);
+        } else {
+          setError(result.error || 'Search failed');
+          setBusinesses([]);
         }
-
-        setBusinesses(businessesList);
-      } else {
-        setError(result.error || 'Search failed');
+      } catch (err) {
+        console.error('Search error:', err);
+        setError('Search failed. Please try again.');
+        setBusinesses([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Search error:', err);
-      setError('Search failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    }, 500);
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleGetDirections = (business: Business) => {
     if (!business.address?.latitude || !business.address?.longitude) {
@@ -407,6 +430,14 @@ const SearchPage: React.FC<SearchPageProps> = ({
               value={searchQuery}
               onChangeText={handleSearch}
               returnKeyType="search"
+              onSubmitEditing={() => {
+                // Trigger search immediately on submit
+                if (searchQuery.trim()) {
+                  handleSearch(searchQuery);
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
         </View>
