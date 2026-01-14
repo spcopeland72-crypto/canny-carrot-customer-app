@@ -292,71 +292,65 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // Ticker animation - smooth pixel scrolling with character-based circular wrap
+  // Ticker animation - TRUE character-by-character circular buffer
   // HOW IT WORKS:
-  // 1. Text moves smoothly pixel-by-pixel from right to left
-  // 2. When a character fully exits left screen, it wraps to rightmost position
-  // 3. All characters continuously shift left
-  // 4. Example: "Canny" -> "C" exits left, appears on right -> "annyC" -> "a" exits, appears -> "nnyCa"
-  // 5. Uses Animated.Value for smooth pixel movement, text rendered multiple times for seamless wrap
+  // 1. Text is a circular buffer: "Canny Carrot..."
+  // 2. Each frame, we rotate the string: move first char to end
+  // 3. When "C" scrolls off left, it immediately appears on right
+  // 4. Example: "Canny" -> "annyC" -> "nnyCa" -> "nyCan" -> "yCann" -> "Canny" (loop)
+  // 5. Uses setInterval to rotate characters, Animated.Value for smooth pixel movement
   
-  const tickerAnim = useRef(new Animated.Value(0)).current;
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const spacing = "          "; // 10 spaces
   const fullText = `${tickerText}${spacing}`;
-  // Render text 3 times for seamless wrap: [text][text][text]
-  const tickerContent = `${fullText}${fullText}${fullText}`;
-  const [textWidth, setTextWidth] = useState(0);
-  const textWidthRef = useRef(0);
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // Measure actual width of ONE instance (fullText)
-  const handleTickerLayout = (event: any) => {
-    const { width } = event.nativeEvent.layout;
-    // We measured 3 instances, so divide by 3 to get one instance width
-    const oneInstanceWidth = width / 3;
-    if (oneInstanceWidth > 0 && oneInstanceWidth !== textWidthRef.current) {
-      textWidthRef.current = oneInstanceWidth;
-      setTextWidth(oneInstanceWidth);
-    }
+  // Character rotation state - tracks current offset in circular buffer
+  const [charOffset, setCharOffset] = useState(0);
+  const [displayText, setDisplayText] = useState(fullText);
+  const rotationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Character width estimation (12px font size, average char width ~7px)
+  const charWidth = 7;
+  const screenWidth = Dimensions.get('window').width || 375;
+  const visibleChars = Math.ceil(screenWidth / charWidth) + 5; // Extra chars for smooth transition
+  
+  // Rotate string: move first character to end
+  const rotateString = (str: string): string => {
+    if (str.length === 0) return str;
+    return str.substring(1) + str[0];
   };
   
+  // Animate character rotation
   useEffect(() => {
-    if (textWidth === 0) return; // Wait for layout measurement
-    
-    // Stop any existing animation
-    if (animationRef.current) {
-      animationRef.current.stop();
+    // Stop any existing rotation
+    if (rotationIntervalRef.current) {
+      clearInterval(rotationIntervalRef.current);
     }
     
-    // Start animation from 0
-    tickerAnim.setValue(0);
-    
-    // Create seamless infinite loop
-    // Animates from 0 to -textWidth (one full instance scrolls left)
-    // When first instance's "C" reaches -textWidth (fully off left),
-    // second instance's "C" is at position 0 (right edge of screen)
-    // Animation loops back to 0 - second instance continues seamlessly
-    // Each character that exits left immediately appears on right
-    const animation = Animated.loop(
-      Animated.timing(tickerAnim, {
-        toValue: -textWidth,
-        duration: 20000, // Smooth scrolling speed (adjust for faster/slower)
-        easing: Easing.linear, // Linear for constant speed
-        useNativeDriver: true,
-      }),
-      { iterations: -1 } // Infinite loop
-    );
-    
-    animationRef.current = animation;
-    animation.start();
+    // Rotate one character every 50ms (adjust for speed)
+    rotationIntervalRef.current = setInterval(() => {
+      setDisplayText((prev) => {
+        const rotated = rotateString(prev);
+        return rotated;
+      });
+      setCharOffset((prev) => (prev + 1) % fullText.length);
+    }, 50); // 50ms = 20 characters per second
     
     return () => {
-      if (animationRef.current) {
-        animationRef.current.stop();
+      if (rotationIntervalRef.current) {
+        clearInterval(rotationIntervalRef.current);
       }
     };
-  }, [textWidth]);
+  }, [fullText.length]);
+  
+  // Initialize display text with enough characters to fill screen
+  useEffect(() => {
+    if (displayText.length < visibleChars) {
+      // Repeat text enough times to fill screen + buffer
+      const repeats = Math.ceil(visibleChars / fullText.length) + 1;
+      setDisplayText(fullText.repeat(repeats));
+    }
+  }, []);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -706,24 +700,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         {/* Ticker - Smooth pixel scrolling with character wrap */}
+        {/* Ticker - TRUE character-by-character rotation */}
         <View style={styles.tickerContainer}>
           <View style={styles.tickerWrapper} collapsable={false}>
-            <Animated.View 
-              style={[
-                styles.tickerContent, 
-                {
-                  transform: [{translateX: tickerAnim}],
-                }
-              ]}
-              collapsable={false}
-              onLayout={handleTickerLayout}
-            >
-              {/* Render text 3 times: when first "C" exits left, second "C" appears on right */}
-              {/* Animation moves from 0 to -textWidth, then loops back to 0 seamlessly */}
-              <Text style={styles.tickerText} numberOfLines={1}>
-                {tickerContent}
-              </Text>
-            </Animated.View>
+            <Text style={styles.tickerText} numberOfLines={1}>
+              {displayText.substring(0, visibleChars)}
+            </Text>
           </View>
         </View>
 
@@ -1373,11 +1355,6 @@ const styles = StyleSheet.create({
     height: 20,
     width: '100%',
   },
-  tickerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // Contains 3 copies of text for seamless wrap
-  },
   tickerText: {
     fontSize: 12,
     color: Colors.text.primary,
@@ -1385,10 +1362,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexShrink: 0,
     includeFontPadding: false,
-    // Text contains 3 copies: "Canny... [spacing] Canny... [spacing] Canny... [spacing]"
-    // When first "C" scrolls off left at -textWidth, second "C" is at position 0 (right edge)
-    // Animation loops to 0 - second copy continues seamlessly
-    // Each character that exits left immediately appears on right
+    // Text rotates character-by-character: when "C" exits left, it appears on right
+    // Each character moves left one position, first char wraps to end
   },
   bannerTextContainer: {
     flex: 1,
