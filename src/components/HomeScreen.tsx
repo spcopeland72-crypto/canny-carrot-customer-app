@@ -292,34 +292,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // EXACT CodePen ticker - NO MODIFICATIONS
-  // CodePen: padding-left: 100% pushes ticker off-screen right
-  // CodePen: padding-right: 100% adds space after text
-  // CodePen: translate3d(-100%, 0, 0) moves by -100% of ticker element's width
-  // CodePen: Two ticker__item spans with same text for seamless wrap
-  
+  // Single string infinite scroll - text scrolls off left, reappears from right
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
   const screenWidth = Dimensions.get('window').width || 375;
   const tickerAnimation = useRef(new Animated.Value(0)).current;
-  const [tickerWidth, setTickerWidth] = useState(0);
+  const [textWidth, setTextWidth] = useState(0);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // CodePen: animation: ticker 30s linear infinite
+  // Continuous scroll: move by text width, then loop seamlessly
   useEffect(() => {
-    if (tickerWidth > 0) {
+    if (textWidth > 0) {
       if (animationRef.current) {
         animationRef.current.stop();
       }
       tickerAnimation.setValue(0);
-      const duration = 30000; // CodePen: $duration: 30s
+      const duration = 30000; // 30 seconds
       animationRef.current = Animated.loop(
         Animated.timing(tickerAnimation, {
           toValue: 1,
           duration: duration,
-          easing: Easing.linear, // CodePen: linear
+          easing: Easing.linear,
           useNativeDriver: Platform.OS !== 'web',
         }),
-        { iterations: -1 } // CodePen: infinite
+        { iterations: -1 }
       );
       animationRef.current.start();
     }
@@ -328,7 +323,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         animationRef.current.stop();
       }
     };
-  }, [tickerWidth]);
+  }, [textWidth]);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -1360,32 +1355,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  // Ticker styles - EXACT CodePen CSS copy
-  // CodePen: .ticker-wrap { padding-left: 100%; }
+  // Ticker styles - Single string infinite scroll
   tickerWrap: {
     width: '100%',
     overflow: 'hidden',
-    height: 64, // CodePen: 4rem = 64px
-    backgroundColor: 'rgba(0, 0, 0, 0.9)', // CodePen: rgba(#000, 0.9)
-    paddingLeft: Dimensions.get('window').width, // CodePen: padding-left: 100%
+    height: 64,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     marginBottom: 24,
   },
-  // CodePen: .ticker { padding-right: 100%; animation: translate3d(-100%, 0, 0); }
   ticker: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64, // CodePen: 4rem = 64px
-    lineHeight: 64, // CodePen: line-height: 4rem
-    paddingRight: Dimensions.get('window').width, // CodePen: padding-right: 100%
+    height: 64,
+    lineHeight: 64,
   },
-  // CodePen: .ticker__item { display: inline-block; padding: 0 2rem; font-size: 2rem; color: white; }
   tickerItem: {
-    paddingHorizontal: 32, // CodePen: 0 2rem = 32px
-    fontSize: 32, // CodePen: 2rem = 32px
-    color: 'white', // CodePen: color: white
+    paddingHorizontal: 32,
+    fontSize: 32,
+    color: 'white',
     includeFontPadding: false,
     flexShrink: 0,
-    // Ensure text renders fully - no width constraints
   },
   bannerTextContainer: {
     flex: 1,
