@@ -1366,33 +1366,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  // Ticker styles - Exact CodePen CSS conversion
+  // Ticker styles - EXACT CodePen CSS copy
+  // CodePen: .ticker-wrap { padding-left: 100%; }
   tickerWrap: {
     width: '100%',
     overflow: 'hidden',
-    height: 32,
-    backgroundColor: Colors.neutral[50],
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.neutral[200],
-    paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes ticker element off-screen right)
+    height: 64, // CodePen: 4rem = 64px
+    backgroundColor: 'rgba(0, 0, 0, 0.9)', // CodePen: rgba(#000, 0.9)
+    paddingLeft: Dimensions.get('window').width, // CodePen: padding-left: 100%
     marginBottom: 24,
   },
+  // CodePen: .ticker { padding-right: 100%; animation: translate3d(-100%, 0, 0); }
   ticker: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 32,
-    paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text for seamless loop)
+    height: 64, // CodePen: 4rem = 64px
+    lineHeight: 64, // CodePen: line-height: 4rem
+    paddingRight: Dimensions.get('window').width, // CodePen: padding-right: 100%
   },
+  // CodePen: .ticker__item { display: inline-block; padding: 0 2rem; font-size: 2rem; color: white; }
   tickerItem: {
-    paddingHorizontal: 16,
-    fontSize: 12,
-    color: Colors.text.primary,
+    paddingHorizontal: 32, // CodePen: 0 2rem = 32px
+    fontSize: 32, // CodePen: 2rem = 32px
+    color: 'white', // CodePen: color: white
     includeFontPadding: false,
     flexShrink: 0,
-    // Ensure text renders at full width - no constraints
-    width: undefined,
-    maxWidth: undefined,
   },
   bannerTextContainer: {
     flex: 1,
