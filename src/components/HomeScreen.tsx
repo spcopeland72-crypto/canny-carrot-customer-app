@@ -704,7 +704,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     translateX: tickerAnimation.interpolate({
                       inputRange: [0, 1],
                       outputRange: tickerWidth > 0 
-                        ? [0, -tickerWidth] // CodePen: translate3d(-100%, 0, 0) = -100% of .ticker width
+                        ? [0, -(tickerWidth + screenWidth)] // Move completely off left border, then loop
                         : [0, 0],
                     }),
                   },
