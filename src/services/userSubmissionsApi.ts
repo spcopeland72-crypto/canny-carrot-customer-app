@@ -4,8 +4,19 @@
  */
 
 import { UserSubmittedEntry } from '../types/search.types';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://localhost:3001/api/v1';
+// Determine API base URL based on environment
+const getApiBaseUrl = (): string => {
+  // For web production, use production API
+  if (Platform.OS === 'web' && !__DEV__) {
+    return 'https://api.cannycarrot.com/api/v1';
+  }
+  // For development or local testing
+  return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T> {
   success: boolean;
