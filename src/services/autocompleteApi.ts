@@ -42,6 +42,10 @@ type FieldType = 'businessName' | 'sector' | 'country' | 'region' | 'city' | 'st
 /**
  * Fetch autocomplete suggestions
  * GET /api/v1/suggestions/{fieldType}?query={searchTerm}
+ * 
+ * Note: For 'businessName' fieldType, the backend should return suggestions
+ * from active businesses in Redis (status: 'active').
+ * Backend should query Redis for businesses matching the query and filter by active status.
  */
 export async function fetchAutocompleteSuggestions(
   fieldType: FieldType,
