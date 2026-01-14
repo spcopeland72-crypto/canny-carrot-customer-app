@@ -32,6 +32,7 @@ if (Platform.OS === 'web' && typeof console !== 'undefined') {
 import HomeScreen from './src/components/HomeScreen';
 import {loadRewards, saveRewards, type CustomerReward} from './src/utils/dataStorage';
 import SearchPage from './src/components/SearchPage';
+import GeoSearchPage from './src/components/GeoSearch/GeoSearchPage';
 import ScanPage from './src/components/ScanPage';
 import WalletPage from './src/components/WalletPage';
 import MorePage from './src/components/MorePage';
@@ -210,6 +211,15 @@ function App(): React.JSX.Element {
       case 'Search':
         return (
           <SearchPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'GeoSearch':
+        return (
+          <GeoSearchPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}

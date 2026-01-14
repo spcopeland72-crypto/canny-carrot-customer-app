@@ -49,3 +49,4 @@ export const useAutocomplete = (fieldType: FieldType) => {
   return { suggestions, loading, error, fetchSuggestions };
 };
 
+

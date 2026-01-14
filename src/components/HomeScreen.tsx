@@ -292,65 +292,47 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
-  // Ticker animation - TRUE character-by-character circular buffer
-  // HOW IT WORKS:
-  // 1. Text is a circular buffer: "Canny Carrot..."
-  // 2. Each frame, we rotate the string: move first char to end
-  // 3. When "C" scrolls off left, it immediately appears on right
-  // 4. Example: "Canny" -> "annyC" -> "nnyCa" -> "nyCan" -> "yCann" -> "Canny" (loop)
-  // 5. Uses setInterval to rotate characters, Animated.Value for smooth pixel movement
+  // Ticker animation - Exact CodePen implementation
+  // CSS: padding-left: 100% pushes content off-screen right
+  // CSS: padding-right: 100% adds space after text  
+  // CSS: translate3d(-100%, 0, 0) animates by -100% of element width
+  // Text is duplicated for seamless loop
   
   const tickerText = "Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers";
-  const spacing = "          "; // 10 spaces
-  const fullText = `${tickerText}${spacing}`;
-  
-  // Character rotation state - tracks current offset in circular buffer
-  const [charOffset, setCharOffset] = useState(0);
-  const [displayText, setDisplayText] = useState(fullText);
-  const rotationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Character width estimation (12px font size, average char width ~7px)
-  const charWidth = 7;
   const screenWidth = Dimensions.get('window').width || 375;
-  const visibleChars = Math.ceil(screenWidth / charWidth) + 5; // Extra chars for smooth transition
+  const tickerAnimation = useRef(new Animated.Value(0)).current;
+  const [tickerWidth, setTickerWidth] = useState(0);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   
-  // Rotate string: move first character to end
-  const rotateString = (str: string): string => {
-    if (str.length === 0) return str;
-    return str.substring(1) + str[0];
+  // Start animation when width is measured
+  const startTickerAnimation = (width: number) => {
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    tickerAnimation.setValue(0);
+    const duration = 30000; // 30 seconds as per CodePen
+    animationRef.current = Animated.loop(
+      Animated.timing(tickerAnimation, {
+        toValue: 1,
+        duration: duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animationRef.current.start();
   };
   
-  // Animate character rotation
+  // Start animation when width is available
   useEffect(() => {
-    // Stop any existing rotation
-    if (rotationIntervalRef.current) {
-      clearInterval(rotationIntervalRef.current);
+    if (tickerWidth > 0) {
+      startTickerAnimation(tickerWidth);
     }
-    
-    // Rotate one character every 50ms (adjust for speed)
-    rotationIntervalRef.current = setInterval(() => {
-      setDisplayText((prev) => {
-        const rotated = rotateString(prev);
-        return rotated;
-      });
-      setCharOffset((prev) => (prev + 1) % fullText.length);
-    }, 50); // 50ms = 20 characters per second
-    
     return () => {
-      if (rotationIntervalRef.current) {
-        clearInterval(rotationIntervalRef.current);
+      if (animationRef.current) {
+        animationRef.current.stop();
       }
     };
-  }, [fullText.length]);
-  
-  // Initialize display text with enough characters to fill screen
-  useEffect(() => {
-    if (displayText.length < visibleChars) {
-      // Repeat text enough times to fill screen + buffer
-      const repeats = Math.ceil(visibleChars / fullText.length) + 1;
-      setDisplayText(fullText.repeat(repeats));
-    }
-  }, []);
+  }, [tickerWidth]);
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -699,14 +681,32 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* Ticker - Smooth pixel scrolling with character wrap */}
-        {/* Ticker - TRUE character-by-character rotation */}
-        <View style={styles.tickerContainer}>
-          <View style={styles.tickerWrapper} collapsable={false}>
-            <Text style={styles.tickerText} numberOfLines={1}>
-              {displayText.substring(0, visibleChars)}
-            </Text>
-          </View>
+        {/* Ticker - Exact CodePen implementation */}
+        <View style={styles.tickerWrap}>
+          <Animated.View
+            style={[
+              styles.ticker,
+              {
+                transform: [
+                  {
+                    translateX: tickerAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, tickerWidth > 0 ? -tickerWidth : -screenWidth * 2],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            onLayout={(event) => {
+              const { width } = event.nativeEvent.layout;
+              if (width > 0 && tickerWidth !== width) {
+                setTickerWidth(width);
+              }
+            }}
+          >
+            <Text style={styles.tickerItem}>{tickerText}</Text>
+            <Text style={styles.tickerItem}>{tickerText}</Text>
+          </Animated.View>
         </View>
 
         {/* Rewards Section */}
@@ -1340,36 +1340,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  tickerContainer: {
-    backgroundColor: Colors.neutral[50],
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.neutral[200],
-    paddingVertical: 8,
-    marginBottom: 24,
-    overflow: 'hidden',
-    zIndex: 1,
-  },
-  tickerWrapper: {
-    overflow: 'hidden',
-    height: 20,
+  // Ticker styles - Exact CodePen CSS conversion
+  tickerWrap: {
+    position: 'absolute',
+    bottom: 0,
     width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end', // Align text to right edge
-    alignItems: 'center',
+    overflow: 'hidden',
+    height: 64, // 4rem = 64px
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    paddingLeft: Dimensions.get('window').width, // padding-left: 100% (pushes content off-screen right)
   },
-  tickerText: {
-    fontSize: 12,
-    color: Colors.text.primary,
-    fontWeight: '500',
-    paddingRight: 16, // Padding from right edge
-    paddingLeft: 0, // No left padding - starts at screen edge
-    flexShrink: 0,
+  ticker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 64, // 4rem = 64px
+    paddingRight: Dimensions.get('window').width, // padding-right: 100% (adds space after text)
+  },
+  tickerItem: {
+    paddingHorizontal: 32, // 2rem = 32px (0 2rem)
+    fontSize: 32, // 2rem = 32px
+    color: 'white',
     includeFontPadding: false,
-    textAlign: 'left', // Text flows left from right edge
-    // Text rotates character-by-character: when "C" exits left, it appears on right
-    // Each character moves left one position, first char wraps to end
-    // Text starts at right border of screen, scrolls left
   },
   bannerTextContainer: {
     flex: 1,

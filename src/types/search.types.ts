@@ -63,3 +63,4 @@ export interface UserSubmittedEntry {
   status?: 'pending' | 'approved' | 'rejected';
 }
 
+

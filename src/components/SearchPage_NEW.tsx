@@ -315,10 +315,10 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
         </View>
       )}
 
-      {!loading && !error && results && results.length > 0 && (
+      {!loading && !error && results.length > 0 && (
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsCount}>
-            {totalCount || results.length} {totalCount === 1 || results.length === 1 ? 'result' : 'results'} found
+            {totalCount} {totalCount === 1 ? 'result' : 'results'} found
           </Text>
           {results.map((business) => (
             <TouchableOpacity
@@ -404,14 +404,14 @@ const SearchPageContent: React.FC<SearchPageProps> = ({
             ]}
             onPress={() => setSearchMode(SearchMode.MAP)}>
             <Text
-                style={[
+              style={[
                 styles.modeButtonText,
                 searchMode === SearchMode.MAP && styles.modeButtonTextActive,
               ]}>
               Map Search
-                </Text>
+            </Text>
           </TouchableOpacity>
-              </View>
+        </View>
 
         {searchMode === SearchMode.TEXT ? (
           <TextSearch onNavigate={onNavigate} />
@@ -639,4 +639,5 @@ const styles = StyleSheet.create({
 });
 
 export default SearchPage;
+
 
