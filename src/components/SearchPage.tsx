@@ -165,6 +165,19 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
     switch (field) {
       case 'businessName':
         setBusinessName(suggestion.value);
+        // If business name is selected and has address metadata, populate address fields
+        if (suggestion.metadata?.address) {
+          const addr = suggestion.metadata.address;
+          if (addr.street) setStreet(addr.street);
+          if (addr.city) setCity(addr.city);
+          if (addr.region) setRegion(addr.region);
+          if (addr.postcode) setPostcode(addr.postcode);
+          if (addr.country) setCountry(addr.country);
+        }
+        // Also populate sector from category if available
+        if (suggestion.metadata?.category) {
+          setSector(suggestion.metadata.category);
+        }
         break;
       case 'sector':
         setSector(suggestion.value);
