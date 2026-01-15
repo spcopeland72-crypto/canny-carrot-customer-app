@@ -151,8 +151,8 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
   const [city, setCity] = useState('');
   const [street, setStreet] = useState('');
   const [postcode, setPostcode] = useState('');
-  const [rewardsOnly, setRewardsOnly] = useState(false);
-  const [campaignsOnly, setCampaignsOnly] = useState(false);
+  // Radio button selection: 'rewards' | 'campaigns' | 'both'
+  const [resultsType, setResultsType] = useState<'rewards' | 'campaigns' | 'both'>('both');
   const [distance, setDistance] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState<'distance' | 'name' | 'relevance'>('distance');
   const [distanceModalVisible, setDistanceModalVisible] = useState(false);
@@ -221,8 +221,8 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
         street: street || undefined,
         postcode: postcode || undefined,
       },
-      rewardsOnly,
-      campaignsOnly,
+      rewardsOnly: resultsType === 'rewards' || resultsType === 'both',
+      campaignsOnly: resultsType === 'campaigns' || resultsType === 'both',
       distance,
       sortBy,
     });
@@ -296,23 +296,32 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
         autoCapitalize="characters"
       />
 
-      <Text style={styles.sectionTitle}>Filters</Text>
-      <View style={styles.filterRow}>
-        <Text style={styles.filterLabel}>Rewards Only</Text>
-        <Switch
-          value={rewardsOnly}
-          onValueChange={setRewardsOnly}
-          trackColor={{false: Colors.neutral[300], true: Colors.primary}}
-        />
-      </View>
-
-      <View style={styles.filterRow}>
-        <Text style={styles.filterLabel}>Campaigns Only</Text>
-        <Switch
-          value={campaignsOnly}
-          onValueChange={setCampaignsOnly}
-          trackColor={{false: Colors.neutral[300], true: Colors.primary}}
-        />
+      <Text style={styles.sectionTitle}>Show Results</Text>
+      <View style={styles.radioGroup}>
+        <TouchableOpacity
+          style={styles.radioOption}
+          onPress={() => setResultsType('both')}>
+          <View style={styles.radioButton}>
+            {resultsType === 'both' && <View style={styles.radioButtonSelected} />}
+          </View>
+          <Text style={styles.radioLabel}>Rewards & Campaigns</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.radioOption}
+          onPress={() => setResultsType('rewards')}>
+          <View style={styles.radioButton}>
+            {resultsType === 'rewards' && <View style={styles.radioButtonSelected} />}
+          </View>
+          <Text style={styles.radioLabel}>Rewards Only</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.radioOption}
+          onPress={() => setResultsType('campaigns')}>
+          <View style={styles.radioButton}>
+            {resultsType === 'campaigns' && <View style={styles.radioButtonSelected} />}
+          </View>
+          <Text style={styles.radioLabel}>Campaigns Only</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.filterRow}>
@@ -475,31 +484,94 @@ const TextSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}>
           <Text style={styles.resultsCount}>
             {totalCount || results.length} {totalCount === 1 || results.length === 1 ? 'result' : 'results'} found
           </Text>
-          {results.map((business) => (
-            <TouchableOpacity
-              key={business.id}
-              style={styles.resultCard}
-              onPress={() => onNavigate('BusinessDetail', {businessId: business.id})}>
-              {business.thumbnailUrl && (
-                <Image
-                  source={{uri: business.thumbnailUrl}}
-                  style={styles.resultThumbnail}
-                />
-              )}
-              <View style={styles.resultContent}>
-                <Text style={styles.resultName}>{business.name}</Text>
-                <Text style={styles.resultSector}>{business.sector}</Text>
-                <Text style={styles.resultAddress}>
-                  {business.location.formattedAddress}
-                </Text>
-                {business.distanceFromSearch !== undefined && (
-                  <Text style={styles.resultDistance}>
-                    {business.distanceFromSearch.toFixed(1)} miles away
+          {(() => {
+            // Collect all rewards and campaigns from all businesses
+            const allItems: Array<{type: 'reward' | 'campaign', data: any, business: any}> = [];
+            
+            results.forEach((business: any) => {
+              const rewards = business.rewardsPrograms || [];
+              const campaigns = business.campaigns || [];
+              
+              if (resultsType === 'rewards' || resultsType === 'both') {
+                rewards.forEach((reward: any) => {
+                  allItems.push({
+                    type: 'reward',
+                    data: reward,
+                    business: business,
+                  });
+                });
+              }
+              
+              if (resultsType === 'campaigns' || resultsType === 'both') {
+                campaigns.forEach((campaign: any) => {
+                  allItems.push({
+                    type: 'campaign',
+                    data: campaign,
+                    business: business,
+                  });
+                });
+              }
+            });
+            
+            if (allItems.length === 0) {
+              return (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    No {resultsType === 'rewards' ? 'rewards' : resultsType === 'campaigns' ? 'campaigns' : 'rewards or campaigns'} found
                   </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <Text style={styles.emptySubtext}>
+                    Try adjusting your search filters
+                  </Text>
+                </View>
+              );
+            }
+            
+            return allItems.map((rewardOrCampaign, idx) => {
+              const isReward = rewardOrCampaign.type === 'reward';
+              const itemData = rewardOrCampaign.data;
+              const business = rewardOrCampaign.business;
+              
+              // Calculate progress: current points/stamps out of required
+              // For rewards: costStamps or stampsRequired
+              // For campaigns: conditions.bonusStamps or similar
+              const required = isReward 
+                ? (itemData.costStamps || itemData.stampsRequired || itemData.pointsRequired || 0)
+                : (itemData.conditions?.bonusStamps || itemData.pointsRequired || 5); // Default for campaigns
+              
+              const current = isReward
+                ? (itemData.customerProgress?.['current-user'] || itemData.currentPoints || 0)
+                : (itemData.customerProgress?.['current-user'] || itemData.currentPoints || 0);
+              
+              const progress = required > 0 ? `${current}/${required}` : '0/0';
+              
+              return (
+                <TouchableOpacity
+                  key={`${business.id}-${rewardOrCampaign.type}-${itemData.id || idx}`}
+                  style={styles.rewardCard}
+                  onPress={() => onNavigate('BusinessDetail', {businessId: business.id})}>
+                  <View style={styles.rewardIcon}>
+                    <Text style={styles.rewardIconText}>
+                      {isReward ? '🎁' : '🎯'}
+                    </Text>
+                  </View>
+                  <View style={styles.rewardContent}>
+                    <View style={styles.rewardHeader}>
+                      <Text style={styles.rewardTypeLabel}>
+                        {isReward ? 'Reward' : 'Campaign'}
+                      </Text>
+                      <Text style={styles.rewardProgress}>{progress}</Text>
+                    </View>
+                    <Text style={styles.rewardDescription} numberOfLines={2}>
+                      {itemData.description || itemData.name || 'No description'}
+                    </Text>
+                    <Text style={styles.rewardBusiness}>
+                      {business.name}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            });
+          })()}
         </View>
       )}
     </ScrollView>
@@ -513,8 +585,7 @@ const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> 
   const {performMapSearch, results, totalCount, loading, error} = useGeoSearch();
   const [mapBusinessName, setMapBusinessName] = useState('');
   const [mapSector, setMapSector] = useState('');
-  const [mapRewardsOnly, setMapRewardsOnly] = useState(false);
-  const [mapCampaignsOnly, setMapCampaignsOnly] = useState(false);
+  const [mapResultsType, setMapResultsType] = useState<'rewards' | 'campaigns' | 'both'>('both');
   const [userLocation, setUserLocation] = useState<SearchCoordinates | null>(null);
   const mapRef = useRef<any>(null);
 
@@ -541,12 +612,12 @@ const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> 
       northeast: {lat: userLocation.lat + 0.1, lng: userLocation.lng + 0.1},
       southwest: {lat: userLocation.lat - 0.1, lng: userLocation.lng - 0.1},
     };
-    performMapSearch(bounds, {
-      businessName: mapBusinessName || undefined,
-      sector: mapSector || undefined,
-      rewardsOnly: mapRewardsOnly,
-      campaignsOnly: mapCampaignsOnly,
-    });
+                performMapSearch(bounds, {
+                  businessName: mapBusinessName || undefined,
+                  sector: mapSector || undefined,
+                  rewardsOnly: mapResultsType === 'rewards' || mapResultsType === 'both',
+                  campaignsOnly: mapResultsType === 'campaigns' || mapResultsType === 'both',
+                });
   };
 
   const mapUrl = userLocation
@@ -592,21 +663,32 @@ const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> 
           onSuggestionSelect={(s) => setMapSector(s.value)}
           onNewEntry={(v) => submitUserEntry({fieldType: 'sector', enteredValue: v, userId: 'current-user', sessionId: 'current-session'})}
         />
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Rewards Only</Text>
-          <Switch
-            value={mapRewardsOnly}
-            onValueChange={setMapRewardsOnly}
-            trackColor={{false: Colors.neutral[300], true: Colors.primary}}
-          />
-        </View>
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Campaigns Only</Text>
-          <Switch
-            value={mapCampaignsOnly}
-            onValueChange={setMapCampaignsOnly}
-            trackColor={{false: Colors.neutral[300], true: Colors.primary}}
-          />
+        <Text style={styles.sectionTitle}>Show Results</Text>
+        <View style={styles.radioGroup}>
+          <TouchableOpacity
+            style={styles.radioOption}
+            onPress={() => setMapResultsType('both')}>
+            <View style={styles.radioButton}>
+              {mapResultsType === 'both' && <View style={styles.radioButtonSelected} />}
+            </View>
+            <Text style={styles.radioLabel}>Rewards & Campaigns</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.radioOption}
+            onPress={() => setMapResultsType('rewards')}>
+            <View style={styles.radioButton}>
+              {mapResultsType === 'rewards' && <View style={styles.radioButtonSelected} />}
+            </View>
+            <Text style={styles.radioLabel}>Rewards Only</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.radioOption}
+            onPress={() => setMapResultsType('campaigns')}>
+            <View style={styles.radioButton}>
+              {mapResultsType === 'campaigns' && <View style={styles.radioButtonSelected} />}
+            </View>
+            <Text style={styles.radioLabel}>Campaigns Only</Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.searchButton} onPress={handleMapSearch}>
           <Text style={styles.searchButtonText}>Search This Area</Text>
@@ -627,7 +709,9 @@ const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> 
 
       {!loading && !error && results && results.length === 0 && (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No businesses found</Text>
+          <Text style={styles.emptyText}>
+            No {mapResultsType === 'rewards' ? 'rewards' : mapResultsType === 'campaigns' ? 'campaigns' : 'rewards or campaigns'} found
+          </Text>
           <Text style={styles.emptySubtext}>
             Try expanding your search area or removing some filters
           </Text>
@@ -639,31 +723,92 @@ const MapSearch: React.FC<{onNavigate: (screen: string, params?: any) => void}> 
           <Text style={styles.resultsCount}>
             {totalCount || results.length} {totalCount === 1 || results.length === 1 ? 'result' : 'results'} found
           </Text>
-          {results.map((business) => (
-            <TouchableOpacity
-              key={business.id}
-              style={styles.resultCard}
-              onPress={() => onNavigate('BusinessDetail', {businessId: business.id})}>
-              {business.thumbnailUrl && (
-                <Image
-                  source={{uri: business.thumbnailUrl}}
-                  style={styles.resultThumbnail}
-                />
-              )}
-              <View style={styles.resultContent}>
-                <Text style={styles.resultName}>{business.name}</Text>
-                <Text style={styles.resultSector}>{business.sector}</Text>
-                <Text style={styles.resultAddress}>
-                  {business.location.formattedAddress}
-                </Text>
-                {business.distanceFromSearch !== undefined && (
-                  <Text style={styles.resultDistance}>
-                    {business.distanceFromSearch.toFixed(1)} miles away
+          {(() => {
+            // Collect all rewards and campaigns from all businesses
+            const allItems: Array<{type: 'reward' | 'campaign', data: any, business: any}> = [];
+            
+            results.forEach((business: any) => {
+              const rewards = business.rewardsPrograms || [];
+              const campaigns = business.campaigns || [];
+              
+              if (mapResultsType === 'rewards' || mapResultsType === 'both') {
+                rewards.forEach((reward: any) => {
+                  allItems.push({
+                    type: 'reward',
+                    data: reward,
+                    business: business,
+                  });
+                });
+              }
+              
+              if (mapResultsType === 'campaigns' || mapResultsType === 'both') {
+                campaigns.forEach((campaign: any) => {
+                  allItems.push({
+                    type: 'campaign',
+                    data: campaign,
+                    business: business,
+                  });
+                });
+              }
+            });
+            
+            if (allItems.length === 0) {
+              return (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    No {mapResultsType === 'rewards' ? 'rewards' : mapResultsType === 'campaigns' ? 'campaigns' : 'rewards or campaigns'} found
                   </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <Text style={styles.emptySubtext}>
+                    Try adjusting your search filters
+                  </Text>
+                </View>
+              );
+            }
+            
+            return allItems.map((rewardOrCampaign, idx) => {
+              const isReward = rewardOrCampaign.type === 'reward';
+              const itemData = rewardOrCampaign.data;
+              const business = rewardOrCampaign.business;
+              
+              // Calculate progress: current points/stamps out of required
+              const required = isReward 
+                ? (itemData.costStamps || itemData.stampsRequired || itemData.pointsRequired || 0)
+                : (itemData.conditions?.bonusStamps || itemData.pointsRequired || 5);
+              
+              const current = isReward
+                ? (itemData.customerProgress?.['current-user'] || itemData.currentPoints || 0)
+                : (itemData.customerProgress?.['current-user'] || itemData.currentPoints || 0);
+              
+              const progress = required > 0 ? `${current}/${required}` : '0/0';
+              
+              return (
+                <TouchableOpacity
+                  key={`${business.id}-${rewardOrCampaign.type}-${itemData.id || idx}`}
+                  style={styles.rewardCard}
+                  onPress={() => onNavigate('BusinessDetail', {businessId: business.id})}>
+                  <View style={styles.rewardIcon}>
+                    <Text style={styles.rewardIconText}>
+                      {isReward ? '🎁' : '🎯'}
+                    </Text>
+                  </View>
+                  <View style={styles.rewardContent}>
+                    <View style={styles.rewardHeader}>
+                      <Text style={styles.rewardTypeLabel}>
+                        {isReward ? 'Reward' : 'Campaign'}
+                      </Text>
+                      <Text style={styles.rewardProgress}>{progress}</Text>
+                    </View>
+                    <Text style={styles.rewardDescription} numberOfLines={2}>
+                      {itemData.description || itemData.name || 'No description'}
+                    </Text>
+                    <Text style={styles.rewardBusiness}>
+                      {business.name}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            });
+          })()}
         </ScrollView>
       )}
     </View>
@@ -926,6 +1071,93 @@ const styles = StyleSheet.create({
   resultDistance: {
     fontSize: 12,
     color: Colors.text.light,
+  },
+  rewardCard: {
+    flexDirection: 'row',
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  rewardIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.neutral[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rewardIconText: {
+    fontSize: 24,
+  },
+  rewardContent: {
+    flex: 1,
+  },
+  rewardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  rewardTypeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  rewardProgress: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  rewardDescription: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  rewardBusiness: {
+    fontSize: 13,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+  },
+  radioGroup: {
+    marginBottom: 16,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  radioButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  radioButtonSelected: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.primary,
+  },
+  radioLabel: {
+    fontSize: 16,
+    color: Colors.text.primary,
   },
   dropdownButton: {
     flexDirection: 'row',
