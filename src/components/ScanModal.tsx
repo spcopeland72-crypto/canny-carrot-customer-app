@@ -45,7 +45,7 @@ try {
   calvinImage = null;
 }
 
-// Helper function to convert parsed QR to reward format (for backward compatibility)
+// Helper function to convert parsed QR to reward format
 const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
   id: string;
   name: string;
@@ -53,6 +53,7 @@ const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
   rewardType: string;
   products: string[];
   pinCode?: string;
+  businessId?: string;
   business?: {
     name: string;
     address?: string;
@@ -70,6 +71,7 @@ const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
       rewardType: parsed.data.rewardType,
       products: parsed.data.products,
       pinCode: parsed.data.pinCode,
+      businessId: parsed.data.businessId,
       business: parsed.data.business,
     };
   } else if (parsed.type === 'company') {
