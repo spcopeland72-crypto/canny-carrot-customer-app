@@ -350,12 +350,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       
       console.log('[ScanModal] Successfully parsed QR code:', parsedReward);
 
-      // Extract business info and create/update member business record
-      let businessId = 'default';
+      // Extract business ID from QR code (unique ID from registration/creation)
+      const businessId = parsedReward.businessId || 'default';
       let businessName = undefined;
       if (parsedReward.business && parsedReward.business.name) {
         businessName = parsedReward.business.name;
-        businessId = parsedReward.business.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         
         // Create or update member business record
         try {
