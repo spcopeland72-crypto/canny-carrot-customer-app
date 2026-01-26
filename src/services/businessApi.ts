@@ -24,3 +24,32 @@ export async function fetchBusinessById(id: string): Promise<{ name?: string } |
     return null;
   }
 }
+
+/** Fetch campaign selectedProducts + selectedActions for labels (campaign modal). */
+export async function fetchCampaignProductsActions(
+  businessId: string,
+  campaignName: string
+): Promise<{ products: string[]; actions: string[] } | null> {
+  if (!businessId || businessId === 'default') return null;
+  try {
+    const base = getApiBaseUrl().replace(/\/$/, '');
+    const res = await fetch(
+      `${base}/api/v1/campaigns?businessId=${encodeURIComponent(businessId)}`
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const list = json?.data ?? [];
+    if (!Array.isArray(list)) return null;
+    const name = (campaignName || '').trim();
+    const campaign = list.find(
+      (c: { name?: string }) => (c.name || '').trim() === name
+    );
+    if (!campaign) return null;
+    return {
+      products: Array.isArray(campaign.selectedProducts) ? campaign.selectedProducts : [],
+      actions: Array.isArray(campaign.selectedActions) ? campaign.selectedActions : [],
+    };
+  } catch {
+    return null;
+  }
+}

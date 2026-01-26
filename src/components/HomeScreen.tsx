@@ -251,8 +251,9 @@ interface RewardCard {
   isEarned?: boolean; // Whether reward has been earned (points requirement met)
   pinCode?: string; // PIN code for redemption
   qrCode?: string; // QR code value for display
-  businessName?: string; // Business name
-  /** For campaigns: product/action labels per circle (collected first, then "Remaining") */
+  businessName?: string;
+  businessId?: string;
+  /** Fallback labels (collected + "Remaining") when campaign fetch fails. */
   circleLabels?: string[];
 }
 
@@ -287,6 +288,7 @@ interface HomeScreenProps {
     businessLogo?: string;
     qrCode?: string;
     businessName?: string;
+    businessId?: string;
   }>;
 }
 
@@ -443,6 +445,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           pinCode: reward.pinCode,
           qrCode: reward.qrCode,
           businessName: reward.businessName,
+          businessId: reward.businessId,
           circleLabels,
         };
       })
@@ -1225,6 +1228,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         total={selectedRewardForQR?.total || 0}
         businessName={selectedRewardForQR?.businessName}
         circleLabels={selectedRewardForQR?.circleLabels}
+        businessId={selectedRewardForQR?.businessId}
+        isCampaign={selectedRewardForQR?.id?.startsWith('campaign-') ?? false}
         onClose={() => setRewardQRModalVisible(false)}
         onNavigate={onNavigate}
       />

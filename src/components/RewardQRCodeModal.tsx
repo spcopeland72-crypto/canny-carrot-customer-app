@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,23 @@ import {
   Image,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
+import {fetchCampaignProductsActions} from '../services/businessApi';
+
+const ROW_PATTERN = [3, 1, 2];
+
+function chunkIntoRows<T>(arr: T[]): T[][] {
+  const rows: T[][] = [];
+  let i = 0;
+  let p = 0;
+  while (i < arr.length) {
+    const n = ROW_PATTERN[p % ROW_PATTERN.length];
+    const take = Math.min(n, arr.length - i);
+    if (take > 0) rows.push(arr.slice(i, i + take));
+    i += take;
+    p += 1;
+  }
+  return rows;
+}
 
 // Load Canny Carrot logo for stamps
 let ccLogoImage: any = null;
@@ -28,8 +45,10 @@ interface RewardQRCodeModalProps {
   count: number; // Points earned
   total: number; // Points needed
   businessName?: string;
-  /** Product/action label per circle (collected first, then "Remaining"). Length = total. */
+  /** Fallback labels (collected + "Remaining") when campaign fetch fails. */
   circleLabels?: string[];
+  businessId?: string;
+  isCampaign?: boolean;
   onClose: () => void;
   onNavigate?: (screen: string) => void;
 }
@@ -41,30 +60,53 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   total,
   businessName,
   circleLabels,
+  businessId,
+  isCampaign,
   onClose,
   onNavigate,
 }) => {
-  // Create array of circles - total circles, count have stamps; optional label per circle
+  const [productActionLabels, setProductActionLabels] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!visible || !isCampaign || !businessId || !rewardName) {
+      setProductActionLabels(null);
+      return () => {};
+    }
+    let cancelled = false;
+    (async () => {
+      const pa = await fetchCampaignProductsActions(businessId, rewardName);
+      if (cancelled) return;
+      if (pa) {
+        const labels = [...(pa.products || []), ...(pa.actions || [])];
+        setProductActionLabels(labels);
+      } else {
+        setProductActionLabels(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, isCampaign, businessId, rewardName]);
+
+  const rawLabels = productActionLabels ?? circleLabels;
+  const labels =
+    total > 0 && rawLabels
+      ? [...rawLabels.slice(0, total), ...Array(Math.max(0, total - rawLabels.length)).fill('Remaining')].slice(0, total)
+      : rawLabels;
   const circles = Array.from({length: total}, (_, index) => ({
     id: index,
     hasStamp: index < count,
-    label: circleLabels && circleLabels[index] ? String(circleLabels[index]) : undefined,
+    label: labels && labels[index] ? String(labels[index]) : undefined,
   }));
+
+  const rows = chunkIntoRows(circles);
 
   const handleBusinessPage = () => {
     onClose();
-    if (onNavigate) {
-      // Navigate to business page - using MenuPage as business page
-      onNavigate('Menu');
-    }
+    if (onNavigate) onNavigate('Menu');
   };
 
   const handleMessages = () => {
     onClose();
-    if (onNavigate) {
-      // Navigate to chat/messages page
-      onNavigate('Chat');
-    }
+    if (onNavigate) onNavigate('Chat');
   };
 
   return (
@@ -77,24 +119,33 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{rewardName}</Text>
           
-          {/* Circles with stamps across the top; optional product/action label above each */}
+          {/* Rows of 3, 1, 2, 3, 1, 2…; rows of 1 or 2 centered */}
           <View style={styles.circlesContainer}>
-            {circles.map((circle) => (
-              <View key={circle.id} style={styles.circleWrapper}>
-                {circle.label != null ? (
-                  <Text style={styles.circleLabel} numberOfLines={2}>
-                    {circle.label}
-                  </Text>
-                ) : null}
-                <View style={styles.circle}>
-                  {circle.hasStamp && ccLogoImage ? (
-                    <Image
-                      source={ccLogoImage}
-                      style={styles.stampImage}
-                      resizeMode="contain"
-                    />
-                  ) : null}
-                </View>
+            {rows.map((row, ri) => (
+              <View
+                key={ri}
+                style={[
+                  styles.circleRow,
+                  row.length < 3 && styles.circleRowCentered,
+                ]}>
+                {row.map((circle) => (
+                  <View key={circle.id} style={styles.circleWrapper}>
+                    {circle.label != null ? (
+                      <Text style={styles.circleLabel} numberOfLines={2}>
+                        {circle.label}
+                      </Text>
+                    ) : null}
+                    <View style={styles.circle}>
+                      {circle.hasStamp && ccLogoImage ? (
+                        <Image
+                          source={ccLogoImage}
+                          style={styles.stampImage}
+                          resizeMode="contain"
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
           </View>
@@ -147,12 +198,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   circlesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
     marginBottom: 32,
     paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  circleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  circleRowCentered: {
+    justifyContent: 'center',
   },
   circleWrapper: {
     margin: 4,
