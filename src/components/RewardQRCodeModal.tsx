@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Image,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
-import {fetchCampaignProductsActions} from '../services/businessApi';
 
 const ROW_PATTERN = [3, 1, 2];
 
@@ -45,10 +44,8 @@ interface RewardQRCodeModalProps {
   count: number; // Points earned
   total: number; // Points needed
   businessName?: string;
-  /** Fallback labels (collected + "Remaining") when campaign fetch fails. */
+  /** Product/action labels per circle (from QR data only). Length = total. */
   circleLabels?: string[];
-  businessId?: string;
-  isCampaign?: boolean;
   onClose: () => void;
   onNavigate?: (screen: string) => void;
 }
@@ -60,41 +57,17 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   total,
   businessName,
   circleLabels,
-  businessId,
-  isCampaign,
   onClose,
   onNavigate,
 }) => {
-  const [productActionLabels, setProductActionLabels] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    if (!visible || !isCampaign || !businessId || !rewardName) {
-      setProductActionLabels(null);
-      return () => {};
-    }
-    let cancelled = false;
-    (async () => {
-      const pa = await fetchCampaignProductsActions(businessId, rewardName);
-      if (cancelled) return;
-      if (pa) {
-        const labels = [...(pa.products || []), ...(pa.actions || [])];
-        setProductActionLabels(labels);
-      } else {
-        setProductActionLabels(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [visible, isCampaign, businessId, rewardName]);
-
-  const rawLabels = productActionLabels ?? circleLabels;
-  const labels =
-    total > 0 && rawLabels
-      ? [...rawLabels.slice(0, total), ...Array(Math.max(0, total - rawLabels.length)).fill('Remaining')].slice(0, total)
-      : rawLabels;
+  const padded =
+    total > 0 && circleLabels
+      ? [...circleLabels.slice(0, total), ...Array(Math.max(0, total - circleLabels.length)).fill('Remaining')].slice(0, total)
+      : circleLabels;
   const circles = Array.from({length: total}, (_, index) => ({
     id: index,
     hasStamp: index < count,
-    label: labels && labels[index] ? String(labels[index]) : undefined,
+    label: padded && padded[index] ? String(padded[index]) : undefined,
   }));
 
   const rows = chunkIntoRows(circles);

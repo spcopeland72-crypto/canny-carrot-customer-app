@@ -289,6 +289,8 @@ interface HomeScreenProps {
     qrCode?: string;
     businessName?: string;
     businessId?: string;
+    selectedProducts?: string[];
+    selectedActions?: string[];
   }>;
 }
 
@@ -424,16 +426,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   
   const rewardCards: RewardCard[] = sortedRewards.length > 0
     ? sortedRewards.map(reward => {
-        const coll = reward.collectedItems || [];
-        const collectedLabels = coll.map((c: { itemType: string; itemName: string }) => c.itemName).filter(Boolean);
         const total = reward.total || 0;
         const count = reward.count || 0;
+        const products = reward.selectedProducts || [];
+        const actions = reward.selectedActions || [];
+        const fromQr = [...products, ...actions];
+        const coll = reward.collectedItems || [];
+        const collectedLabels = coll.map((c: { itemType: string; itemName: string }) => c.itemName).filter(Boolean);
         const filled = collectedLabels.slice(0, count);
         const rest = Math.max(0, total - filled.length);
         const circleLabels =
           total > 0
-            ? [...filled, ...Array(rest).fill('Remaining')].slice(0, total)
+            ? fromQr.length >= total
+              ? fromQr.slice(0, total)
+              : [...filled, ...Array(rest).fill('Remaining')].slice(0, total)
             : undefined;
+        let businessId = reward.businessId;
+        if (!businessId && reward.id.startsWith('campaign-')) {
+          const parts = reward.id.slice(9).split('-');
+          if (parts.length >= 2) businessId = parts[0];
+        }
         return {
           id: reward.id,
           title: reward.name,
@@ -445,7 +457,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           pinCode: reward.pinCode,
           qrCode: reward.qrCode,
           businessName: reward.businessName,
-          businessId: reward.businessId,
+          businessId: businessId || reward.businessId,
           circleLabels,
         };
       })
@@ -1228,8 +1240,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         total={selectedRewardForQR?.total || 0}
         businessName={selectedRewardForQR?.businessName}
         circleLabels={selectedRewardForQR?.circleLabels}
-        businessId={selectedRewardForQR?.businessId}
-        isCampaign={selectedRewardForQR?.id?.startsWith('campaign-') ?? false}
         onClose={() => setRewardQRModalVisible(false)}
         onNavigate={onNavigate}
       />

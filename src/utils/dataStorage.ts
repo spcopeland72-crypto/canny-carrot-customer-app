@@ -94,6 +94,9 @@ export interface CustomerReward {
   isEarned?: boolean; // Whether reward has been earned (points requirement met)
   /** For campaigns: which products/actions collected (for modal labels and duplicate detection) */
   collectedItems?: { itemType: string; itemName: string }[];
+  /** From CAMPAIGN_ITEM QR */
+  startDate?: string;
+  endDate?: string;
 }
 
 export const saveRewards = async (rewards: CustomerReward[]): Promise<void> => {

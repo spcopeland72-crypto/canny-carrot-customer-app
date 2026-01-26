@@ -18,7 +18,6 @@ import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorag
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
 import {recordRewardScan, recordCampaignScan} from '../services/customerRecord';
-import {fetchBusinessById} from '../services/businessApi';
 
 // Check if browser supports native BarcodeDetector API
 const supportsBarcodeDetector = (): boolean => {
@@ -306,11 +305,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
 
-      let businessName: string | undefined = (itemData.businessName || '').trim() || undefined;
-      if (!businessName && businessId && businessId !== 'default') {
-        const biz = await fetchBusinessById(businessId);
-        businessName = biz?.name;
-      }
+      const businessName: string | undefined = (itemData.businessName || '').trim() || undefined;
+      const startDate = (itemData.startDate || '').trim() || undefined;
+      const endDate = (itemData.endDate || '').trim() || undefined;
 
       // Default campaign points: 1 point per scan, 5 points required
       const pointsPerScan = 1;
@@ -359,10 +356,20 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         existingCampaign.lastScannedAt = new Date().toISOString();
         if (businessId && businessId !== 'default') existingCampaign.businessId = businessId;
         existingCampaign.businessName = businessName ?? undefined;
+        if (startDate != null) existingCampaign.startDate = startDate;
+        if (endDate != null) existingCampaign.endDate = endDate;
         const prev = existingCampaign.collectedItems || [];
         const key = `${itemType}:${itemName}`;
         if (itemName && !prev.some((c) => `${c.itemType}:${c.itemName}` === key)) {
           existingCampaign.collectedItems = [...prev, { itemType, itemName }];
+          const prods = existingCampaign.selectedProducts || [];
+          const acts = existingCampaign.selectedActions || [];
+          if (itemType === 'product' && !prods.includes(itemName)) {
+            existingCampaign.selectedProducts = [...prods, itemName];
+          }
+          if (itemType === 'action' && !acts.includes(itemName)) {
+            existingCampaign.selectedActions = [...acts, itemName];
+          }
         }
 
         const updatedRewards = existingRewards.map(r =>
@@ -399,6 +406,10 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           pointsEarned: campaignProgress.pointsEarned,
           businessId: businessId !== 'default' ? businessId : undefined,
           businessName: businessName ?? undefined,
+          startDate,
+          endDate,
+          selectedProducts: itemType === 'product' && itemName ? [itemName] : [],
+          selectedActions: itemType === 'action' && itemName ? [itemName] : [],
           isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
           createdAt: new Date().toISOString(),
           lastScannedAt: new Date().toISOString(),
@@ -716,6 +727,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
         if (businessId !== 'default') existingReward.businessId = businessId;
         if (businessName != null) existingReward.businessName = businessName;
+        if (parsedReward.products && parsedReward.products.length > 0) {
+          existingReward.selectedProducts = parsedReward.products;
+        }
         
         const updatedRewards = existingRewards.map(r => 
           r.id === existingReward!.id ? existingReward! : r
