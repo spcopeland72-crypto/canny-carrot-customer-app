@@ -358,7 +358,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         existingCampaign.isEarned = campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed';
         existingCampaign.lastScannedAt = new Date().toISOString();
         if (businessId && businessId !== 'default') existingCampaign.businessId = businessId;
-        if (businessName != null) existingCampaign.businessName = businessName;
+        existingCampaign.businessName = businessName ?? undefined;
         const prev = existingCampaign.collectedItems || [];
         const key = `${itemType}:${itemName}`;
         if (itemName && !prev.some((c) => `${c.itemType}:${c.itemName}` === key)) {

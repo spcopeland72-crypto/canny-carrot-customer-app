@@ -816,44 +816,48 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       card.id === '3' && styles.rewardIconOverlayGreen,
                       isCampaign && styles.rewardIconOverlayCampaign,
                     ]}>
-                      {card.id === '1' && blackwellsLogo ? (
-                        <Image
-                          source={blackwellsLogo}
-                          style={styles.rewardImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.log('Blackwells logo failed to load, using emoji');
-                          }}
-                        />
-                      ) : card.id === '2' && bluecornLogo ? (
-                        <Image
-                          source={bluecornLogo}
-                          style={styles.rewardImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.log('Bluecorn logo failed to load, using emoji');
-                          }}
-                        />
-                      ) : card.id === '3' && sandwichLogo ? (
-                        <Image
-                          source={sandwichLogo}
-                          style={styles.rewardImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.log('Sandwich logo failed to load, using emoji');
-                          }}
-                        />
-                      ) : card.id === '4' && daisyChainImage ? (
-                        <Image
-                          source={daisyChainImage}
-                          style={styles.rewardImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.log('Daisy chain image failed to load, using emoji');
-                          }}
-                        />
-                      ) : (
-                        <Text style={styles.rewardIcon}>{card.icon}</Text>
+                      {!isCampaign && (
+                        <>
+                          {card.id === '1' && blackwellsLogo ? (
+                            <Image
+                              source={blackwellsLogo}
+                              style={styles.rewardImage}
+                              resizeMode="contain"
+                              onError={() => {
+                                console.log('Blackwells logo failed to load, using emoji');
+                              }}
+                            />
+                          ) : card.id === '2' && bluecornLogo ? (
+                            <Image
+                              source={bluecornLogo}
+                              style={styles.rewardImage}
+                              resizeMode="contain"
+                              onError={() => {
+                                console.log('Bluecorn logo failed to load, using emoji');
+                              }}
+                            />
+                          ) : card.id === '3' && sandwichLogo ? (
+                            <Image
+                              source={sandwichLogo}
+                              style={styles.rewardImage}
+                              resizeMode="contain"
+                              onError={() => {
+                                console.log('Sandwich logo failed to load, using emoji');
+                              }}
+                            />
+                          ) : card.id === '4' && daisyChainImage ? (
+                            <Image
+                              source={daisyChainImage}
+                              style={styles.rewardImage}
+                              resizeMode="contain"
+                              onError={() => {
+                                console.log('Daisy chain image failed to load, using emoji');
+                              }}
+                            />
+                          ) : (
+                            <Text style={styles.rewardIcon}>{card.icon}</Text>
+                          )}
+                        </>
                       )}
                       {isEarned && (
                         <TouchableOpacity
@@ -870,15 +874,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         </TouchableOpacity>
                       )}
                     </View>
-                    {/* Count / total in center of icon (Canny Carrot green) */}
+                    {/* Count / total in center (Canny Carrot green); campaigns: only this, no icon */}
                     <View style={styles.rewardCountOverlay} pointerEvents="none">
                       <Text style={styles.rewardCountText}>
                         {card.count} / {card.total}
                       </Text>
                     </View>
                   </View>
-                  {/* 3. Business name underneath */}
-                  {card.businessName ? (
+                  {/* 3. Business name underneath — hide when same as title (campaign name used as businessName) */}
+                  {card.businessName && card.businessName !== card.title ? (
                     <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
                   ) : null}
                 </TouchableOpacity>
@@ -1527,6 +1531,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 80,
     height: 80,
+    zIndex: 10,
   },
   rewardCountText: {
     fontSize: 13,
