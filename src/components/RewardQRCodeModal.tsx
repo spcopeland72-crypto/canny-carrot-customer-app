@@ -60,14 +60,10 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   onClose,
   onNavigate,
 }) => {
-  const padded =
-    total > 0 && circleLabels
-      ? [...circleLabels.slice(0, total), ...Array(Math.max(0, total - circleLabels.length)).fill('Remaining')].slice(0, total)
-      : circleLabels;
   const circles = Array.from({length: total}, (_, index) => ({
     id: index,
     hasStamp: index < count,
-    label: padded && padded[index] ? String(padded[index]) : undefined,
+    label: circleLabels?.[index] ?? undefined,
   }));
 
   const rows = chunkIntoRows(circles);

@@ -55,71 +55,7 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
     loadRewardsData();
   }, [currentScreen, loadRewardsData]);
 
-  // Default example rewards if none loaded
-  const defaultRewards: CustomerReward[] = [
-    {
-      id: '1',
-      name: 'Blackwells Butchers',
-      count: 8,
-      total: 10,
-      icon: '🥐',
-      requirement: 10,
-      pointsEarned: 8,
-      businessName: 'Blackwells Butchers',
-    },
-    {
-      id: '2',
-      name: 'Bluecorn Bakers',
-      count: 7,
-      total: 10,
-      icon: '☕',
-      requirement: 10,
-      pointsEarned: 7,
-      businessName: 'Bluecorn Bakers',
-    },
-    {
-      id: '3',
-      name: 'The Green Florist',
-      count: 9,
-      total: 10,
-      icon: '🥪',
-      requirement: 10,
-      pointsEarned: 9,
-      businessName: 'The Green Florist',
-    },
-    {
-      id: '4',
-      name: 'Sweet Treats',
-      count: 9,
-      total: 10,
-      icon: '🍩',
-      requirement: 10,
-      pointsEarned: 9,
-      businessName: 'Sweet Treats',
-    },
-    {
-      id: '5',
-      name: 'Hot Meals',
-      count: 6,
-      total: 10,
-      icon: '🍲',
-      requirement: 10,
-      pointsEarned: 6,
-      businessName: 'Hot Meals',
-    },
-    {
-      id: '6',
-      name: 'Breakfast',
-      count: 5,
-      total: 10,
-      icon: '🥞',
-      requirement: 10,
-      pointsEarned: 5,
-      businessName: 'Breakfast',
-    },
-  ];
-
-  const displayRewards = rewards.length > 0 ? rewards : defaultRewards;
+  const displayRewards = rewards;
 
   const handleRewardPress = (reward: CustomerReward) => {
     if (reward.isEarned) {
@@ -241,13 +177,16 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             visible={rewardQRModalVisible}
             rewardName={selectedReward?.name || ''}
             qrValue={selectedReward?.qrCode || ''}
+            count={selectedReward?.count ?? 0}
+            total={selectedReward?.total ?? 0}
+            businessName={selectedReward?.businessName}
+            circleLabels={
+              selectedReward && (selectedReward.total ?? 0) > 0
+                ? [...(selectedReward.selectedProducts || []), ...(selectedReward.selectedActions || [])].slice(0, selectedReward.total ?? 0)
+                : undefined
+            }
             onClose={() => setRewardQRModalVisible(false)}
-            onView={() => {
-              setRewardQRModalVisible(false);
-              if (selectedReward) {
-                onNavigate(`Reward${selectedReward.id}`);
-              }
-            }}
+            onNavigate={onNavigate}
           />
           
           {/* Redeem Modal */}

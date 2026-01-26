@@ -52,45 +52,6 @@ try {
 // Banner image disabled - using green background instead
 let bannerImage: any = null;
 
-// Load Blackwells logo using same pattern as banner/logo
-let blackwellsLogo;
-try {
-  blackwellsLogo = require('../../assets/blackwells.png');
-} catch (e) {
-  try {
-    blackwellsLogo = require('../../Images/blackwells.png');
-  } catch (e2) {
-    // Logo not found - will use emoji fallback
-    blackwellsLogo = null;
-  }
-}
-
-// Load Bluecorn Bakery logo for circle 2
-let bluecornLogo;
-try {
-  bluecornLogo = require('../../assets/bluecorn-bakers.png');
-} catch (e) {
-  try {
-    bluecornLogo = require('../../Images/bluecorn-bakers.png');
-  } catch (e2) {
-    // Logo not found - will use emoji fallback
-    bluecornLogo = null;
-  }
-}
-
-// Load logo for circle 3 (Sandwiches & Salads) - The Green Florist
-let sandwichLogo;
-try {
-  sandwichLogo = require('../../assets/green-florist.png');
-} catch (e) {
-  try {
-    sandwichLogo = require('../../Images/green-florist.png');
-  } catch (e2) {
-    // Logo not found - will use emoji fallback
-    sandwichLogo = null;
-  }
-}
-
 // Note: online-black.png will be loaded in component to prevent module-level crashes
 
 // Load Google Maps image for More Goodies section from Images folder
@@ -175,22 +136,6 @@ try {
   // Image not found - will use placeholder
   competitionImage = null;
 }
-
-// Load daisy-chain.png image for Rewards section circle 4
-// Temporarily disabled to prevent blank screen
-let daisyChainImage = null;
-/*
-try {
-  daisyChainImage = require('../../assets/daisy-chain.png');
-} catch (e) {
-  try {
-    daisyChainImage = require('../../Images/daisy-chain.png');
-  } catch (e2) {
-    // Image not found - will use emoji fallback
-    daisyChainImage = null;
-  }
-}
-*/
 
 // Load rotating images for Featured Gold Members card (More Goodies card 3)
 const goldMemberImages = [
@@ -386,10 +331,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const greeting = getTimeBasedGreeting();
 
   // Set online-black.png from module-level variable
-  useEffect(() => {
-    setOnlineBlackImage(onlineBlackIcon);
-  }, []);
-
   // Rotate Featured Gold Members images every 3 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -427,19 +368,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const rewardCards: RewardCard[] = sortedRewards.length > 0
     ? sortedRewards.map(reward => {
         const total = reward.total || 0;
-        const count = reward.count || 0;
         const products = reward.selectedProducts || [];
         const actions = reward.selectedActions || [];
-        const fromQr = [...products, ...actions];
-        const coll = reward.collectedItems || [];
-        const collectedLabels = coll.map((c: { itemType: string; itemName: string }) => c.itemName).filter(Boolean);
-        const filled = collectedLabels.slice(0, count);
-        const rest = Math.max(0, total - filled.length);
         const circleLabels =
           total > 0
-            ? fromQr.length >= total
-              ? fromQr.slice(0, total)
-              : [...filled, ...Array(rest).fill('Remaining')].slice(0, total)
+            ? [...products, ...actions].slice(0, total)
             : undefined;
         let businessId = reward.businessId;
         if (!businessId && reward.id.startsWith('campaign-')) {
@@ -461,15 +394,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           circleLabels,
         };
       })
-    : [
-        // Default sample data if no rewards loaded
-        {id: '1', title: 'Blackwells Butchers', count: 8, total: 10, icon: '🥐', image: blackwellsLogo},
-        {id: '2', title: 'Bluecorn Bakers', count: 7, total: 10, icon: '☕', image: bluecornLogo},
-        {id: '3', title: 'The Green Florist', count: 9, total: 10, icon: '🥪', image: sandwichLogo},
-        {id: '4', title: 'Sweet Treats', count: 9, total: 10, icon: '🍩', image: daisyChainImage},
-        {id: '5', title: 'Hot Meals', count: 6, total: 10, icon: '🍲'},
-        {id: '6', title: 'Breakfast', count: 5, total: 10, icon: '🥞'},
-      ];
+    : [];
 
   const goodieCards: GoodieCard[] = [
     {id: '1', title: 'Find More Rewards', image: ''},
@@ -829,19 +754,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       </>
                     ) : (
                       <>
-                        {card.id === '3' && onlineBlackImage && !onlineImageError ? (
-                          <View style={styles.onlineImageContainer}>
-                            <Image
-                              source={onlineBlackImage}
-                              style={styles.onlineImage}
-                              resizeMode="contain"
-                              onError={() => {
-                                console.log('Online-black image failed to load');
-                                setOnlineImageError(true);
-                              }}
-                            />
-                          </View>
-                        ) : null}
                         <CircularProgress
                           key={`progress-${card.id}`}
                           size={80}
@@ -850,46 +762,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           color={Colors.secondary}
                           backgroundColor={Colors.neutral[200]}
                         />
-                        <View style={[
-                          styles.rewardIconOverlay,
-                          card.id === '2' && styles.rewardIconOverlayBlue,
-                          card.id === '3' && styles.rewardIconOverlayGreen,
-                        ]}>
-                          {card.id === '1' && blackwellsLogo ? (
+                        <View style={styles.rewardIconOverlay}>
+                          {card.image?.uri ? (
                             <Image
-                              source={blackwellsLogo}
+                              source={card.image}
                               style={styles.rewardImage}
                               resizeMode="contain"
-                              onError={() => {
-                                console.log('Blackwells logo failed to load, using emoji');
-                              }}
-                            />
-                          ) : card.id === '2' && bluecornLogo ? (
-                            <Image
-                              source={bluecornLogo}
-                              style={styles.rewardImage}
-                              resizeMode="contain"
-                              onError={() => {
-                                console.log('Bluecorn logo failed to load, using emoji');
-                              }}
-                            />
-                          ) : card.id === '3' && sandwichLogo ? (
-                            <Image
-                              source={sandwichLogo}
-                              style={styles.rewardImage}
-                              resizeMode="contain"
-                              onError={() => {
-                                console.log('Sandwich logo failed to load, using emoji');
-                              }}
-                            />
-                          ) : card.id === '4' && daisyChainImage ? (
-                            <Image
-                              source={daisyChainImage}
-                              style={styles.rewardImage}
-                              resizeMode="contain"
-                              onError={() => {
-                                console.log('Daisy chain image failed to load, using emoji');
-                              }}
                             />
                           ) : (
                             <Text style={styles.rewardIcon}>{card.icon}</Text>
@@ -1594,12 +1472,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  rewardIconOverlayBlue: {
-    backgroundColor: '#87CEEB', // Sky blue to match Bluecorn Bakery logo
-  },
-  rewardIconOverlayGreen: {
-    backgroundColor: '#1B5E20', // Dark green to match The Green Florist logo
   },
   rewardIconOverlayCampaign: {
     backgroundColor: Colors.grey, // Canny Carrot grey for campaigns
