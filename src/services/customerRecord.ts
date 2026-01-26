@@ -37,7 +37,8 @@ export const getCustomerRecord = async (): Promise<CustomerRecord> => {
 };
 
 /**
- * Save the customer record locally and queue for sync
+ * Save the customer record locally and queue for sync.
+ * Use only for profile updates, redeem, or other actions that trigger sync (click, select, sync, logout).
  */
 export const saveCustomerRecord = async (record: CustomerRecord): Promise<void> => {
   record.updatedAt = new Date().toISOString();
@@ -45,6 +46,16 @@ export const saveCustomerRecord = async (record: CustomerRecord): Promise<void> 
   
   // Queue sync to Redis
   await queueOperation('update', 'customer', record.profile.id, record);
+};
+
+/**
+ * Save the customer record locally only — no queue, no sync.
+ * Use for scan updates (reward/campaign QR). Offline-first: scan works without network;
+ * sync happens only on explicit Sync, logout, or other allowed actions.
+ */
+export const saveCustomerRecordLocalOnly = async (record: CustomerRecord): Promise<void> => {
+  record.updatedAt = new Date().toISOString();
+  await storage.set(CUSTOMER_RECORD_KEY, record);
 };
 
 /**
@@ -154,7 +165,7 @@ export const recordRewardScan = async (
     }
   }
   
-  await saveCustomerRecord(record);
+  await saveCustomerRecordLocalOnly(record);
   
   return { record, rewardProgress, isNewlyEarned };
 };
@@ -243,7 +254,7 @@ export const recordCampaignScan = async (
     }
   }
   
-  await saveCustomerRecord(record);
+  await saveCustomerRecordLocalOnly(record);
   
   return { record, campaignProgress, isNewlyEarned };
 };
