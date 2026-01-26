@@ -36,10 +36,21 @@ export interface ParsedCampaignQR {
   pointsPerScan?: number; // Points awarded per scan
 }
 
+export interface ParsedCampaignItemQR {
+  businessId: string;
+  campaignId: string; // Full campaign ID (includes business ID)
+  campaignName: string;
+  itemType: string; // 'product' | 'action' | etc.
+  itemName: string;
+  startDate: string;
+  endDate: string;
+}
+
 export type ParsedQR = 
   | { type: 'reward'; data: ParsedRewardQR }
   | { type: 'company'; data: ParsedCompanyQR }
   | { type: 'campaign'; data: ParsedCampaignQR }
+  | { type: 'campaign_item'; data: ParsedCampaignItemQR }
   | { type: 'unknown'; data: null };
 
 /**
@@ -106,6 +117,38 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
         data: {
           number: parts[1] || '',
           name: parts.slice(2).join(':') || 'Business',
+        },
+      };
+    }
+    return { type: 'unknown', data: null };
+  }
+  
+  // Handle CAMPAIGN_ITEM QR codes (from business app)
+  // Format: CAMPAIGN_ITEM:{businessId}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+  if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
+    const parts = normalizedQr.split(':');
+    if (parts.length >= 7) {
+      const campaignId = parts[1] || ''; // Full campaign ID (e.g., business_1767744076082_i3d1uu42x)
+      // Extract business ID from campaign ID (format: business_xxx or business_xxx_yyy)
+      let businessId = campaignId;
+      if (campaignId.startsWith('business_')) {
+        // Extract just the business part (business_1767744076082)
+        const businessMatch = campaignId.match(/^(business_\d+)/);
+        if (businessMatch) {
+          businessId = businessMatch[1];
+        }
+      }
+      
+      return {
+        type: 'campaign_item',
+        data: {
+          businessId: businessId,
+          campaignId: campaignId,
+          campaignName: parts[2] || 'Campaign',
+          itemType: parts[3] || 'product',
+          itemName: parts[4] || '',
+          startDate: parts[5] || '',
+          endDate: parts[6] || '',
         },
       };
     }
@@ -210,5 +253,6 @@ export const isValidQRCode = (qrValue: string): boolean => {
   const normalized = qrValue.trim();
   return normalized.startsWith('REWARD:') || 
          normalized.startsWith('COMPANY:') || 
-         normalized.startsWith('CAMPAIGN:');
+         normalized.startsWith('CAMPAIGN:') ||
+         normalized.startsWith('CAMPAIGN_ITEM:');
 };

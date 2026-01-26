@@ -288,14 +288,140 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
   // Process scanned campaign QR code
   const processCampaignQRCode = async (qrValue: string, parsed: ReturnType<typeof parseQRCode>) => {
-    if (parsed.type !== 'campaign' || !parsed.data) {
+    if ((parsed.type !== 'campaign' && parsed.type !== 'campaign_item') || !parsed.data) {
       console.warn('[ScanModal] Invalid campaign QR code:', qrValue);
       isProcessingRef.current = false;
       Alert.alert('Invalid QR Code', 'This does not appear to be a valid campaign QR code.');
       return;
     }
 
-    const campaignData = parsed.data;
+    // Handle CAMPAIGN_ITEM format (from business app)
+    if (parsed.type === 'campaign_item') {
+      const itemData = parsed.data as any; // ParsedCampaignItemQR
+      const campaignId = itemData.campaignId || itemData.businessId || 'unknown';
+      const campaignName = itemData.campaignName || 'Campaign';
+      const businessId = itemData.businessId || 'default';
+      const businessName = itemData.campaignName || undefined; // Use campaign name as business name fallback
+      const itemType = itemData.itemType || 'product';
+      const itemName = itemData.itemName || '';
+      
+      // Default campaign points: 1 point per scan, 5 points required
+      const pointsPerScan = 1;
+      const pointsRequired = 5;
+
+      // Load existing rewards to check if campaign already exists
+      const existingRewards = await loadRewards();
+      let existingCampaign = existingRewards.find(
+        r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
+      );
+
+      // Record campaign scan using customer record service
+      console.log('[ScanModal] Recording campaign item scan in customer record');
+      const { campaignProgress, isNewlyEarned } = await recordCampaignScan(
+        campaignId,
+        campaignName,
+        pointsPerScan,
+        pointsRequired,
+        businessId,
+        businessName,
+        qrValue
+      );
+
+      // Create or update campaign as a CustomerReward for carousel display
+      const campaignIcon = '🎯';
+      const campaignType = itemType === 'product' ? 'product' : 'action';
+
+      if (existingCampaign) {
+        // Update existing campaign
+        existingCampaign.pointsEarned = campaignProgress.pointsEarned;
+        existingCampaign.count = Math.floor(campaignProgress.pointsEarned / pointsPerScan);
+        existingCampaign.total = Math.ceil(pointsRequired / pointsPerScan);
+        existingCampaign.isEarned = campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed';
+        existingCampaign.lastScannedAt = new Date().toISOString();
+
+        const updatedRewards = existingRewards.map(r =>
+          r.id === existingCampaign!.id ? existingCampaign! : r
+        );
+        await saveRewards(updatedRewards);
+
+        console.log('[ScanModal] Campaign updated:', existingCampaign.name);
+
+        // Stop camera/scanner
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+
+        // Show success message
+        Alert.alert(
+          'Campaign Updated!',
+          `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
+          [{text: 'OK', onPress: () => {
+            onClose();
+            setTimeout(() => {
+              onRewardScanned?.(existingCampaign!);
+            }, 100);
+          }}]
+        );
+      } else {
+        // Create new campaign entry
+        const newCampaign: CustomerReward = {
+          id: `campaign-${campaignId}`,
+          name: campaignName,
+          count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
+          total: Math.ceil(pointsRequired / pointsPerScan),
+          icon: campaignIcon,
+          type: campaignType,
+          requirement: Math.ceil(pointsRequired / pointsPerScan),
+          pointsPerPurchase: pointsPerScan,
+          rewardType: 'other',
+          qrCode: qrValue,
+          pointsEarned: campaignProgress.pointsEarned,
+          businessId: businessId !== 'default' ? businessId : undefined,
+          businessName: businessName,
+          isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
+          createdAt: new Date().toISOString(),
+          lastScannedAt: new Date().toISOString(),
+        };
+
+        console.log('[ScanModal] Creating new campaign from CAMPAIGN_ITEM:', {
+          id: newCampaign.id,
+          name: newCampaign.name,
+          businessId: newCampaign.businessId,
+          itemName: itemName,
+        });
+
+        const updatedRewards = [...existingRewards, newCampaign];
+        await saveRewards(updatedRewards);
+
+        // Verify the campaign was saved
+        const verifyRewards = await loadRewards();
+        const savedCampaign = verifyRewards.find(r => r.id === newCampaign.id);
+        if (savedCampaign) {
+          console.log('[ScanModal] ✅ New campaign confirmed in storage:', savedCampaign.name);
+        } else {
+          console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
+        }
+
+        // Stop camera/scanner
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+
+        // Show success message
+        Alert.alert(
+          'Campaign Added!',
+          `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
+          [{text: 'OK', onPress: () => {
+            onClose();
+            setTimeout(() => {
+              onRewardScanned?.(newCampaign);
+            }, 100);
+          }}]
+        );
+      }
+      return;
+    }
+
+    // Handle standard CAMPAIGN format
+    const campaignData = parsed.data as any; // ParsedCampaignQR
     const campaignId = campaignData.id;
     const campaignName = campaignData.name || 'Campaign';
     const campaignDescription = campaignData.description || '';
@@ -491,8 +617,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       // Parse QR code using shared utility
       const parsed = parseQRCode(normalizedQr);
       
-      // Handle campaign QR codes separately
-      if (parsed.type === 'campaign') {
+      // Handle campaign QR codes separately (both CAMPAIGN: and CAMPAIGN_ITEM: formats)
+      if (parsed.type === 'campaign' || parsed.type === 'campaign_item') {
         await processCampaignQRCode(normalizedQr, parsed);
         return;
       }
