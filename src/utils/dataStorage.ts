@@ -90,7 +90,7 @@ export interface CustomerReward {
   businessId?: string; // Business/member ID
   businessName?: string; // Business/member name
   createdAt?: string; // When reward was first scanned (for sorting)
-  isEarned?: boolean; // Whether reward has been earned
+  lastScannedAt?: string; // Track last scan time
   isEarned?: boolean; // Whether reward has been earned (points requirement met)
 }
 

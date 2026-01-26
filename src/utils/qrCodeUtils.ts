@@ -29,6 +29,11 @@ export interface ParsedCampaignQR {
   id: string;
   name: string;
   description: string;
+  businessId?: string;
+  businessName?: string;
+  components?: string[]; // Campaign components/requirements
+  pointsRequired?: number; // Points required to complete campaign
+  pointsPerScan?: number; // Points awarded per scan
 }
 
 export type ParsedQR = 
@@ -108,16 +113,49 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle CAMPAIGN QR codes
+  // Format (enhanced): CAMPAIGN:{id}:{name}:{description}:{businessId}:{businessName}:{pointsRequired}:{pointsPerScan}
+  // Format (simple): CAMPAIGN:{id}:{name}:{description}
   if (normalizedQr.startsWith('CAMPAIGN:')) {
     const parts = normalizedQr.split(':');
     if (parts.length >= 3) {
+      const campaignData: ParsedCampaignQR = {
+        id: parts[1] || '',
+        name: parts[2] || 'Campaign',
+        description: parts[3] || '',
+      };
+
+      // Enhanced format with additional fields (parts.length >= 4)
+      if (parts.length >= 5) {
+        campaignData.businessId = parts[4] || undefined;
+      }
+      if (parts.length >= 6) {
+        campaignData.businessName = parts[5] || undefined;
+      }
+      if (parts.length >= 7) {
+        const pointsRequired = parseInt(parts[6], 10);
+        if (!isNaN(pointsRequired)) {
+          campaignData.pointsRequired = pointsRequired;
+        }
+      }
+      if (parts.length >= 8) {
+        const pointsPerScan = parseInt(parts[7], 10);
+        if (!isNaN(pointsPerScan)) {
+          campaignData.pointsPerScan = pointsPerScan;
+        }
+      }
+      // Components could be in remaining parts (comma-separated or colon-separated)
+      if (parts.length >= 9) {
+        const componentsStr = parts.slice(8).join(':');
+        if (componentsStr.includes(',')) {
+          campaignData.components = componentsStr.split(',').map(c => c.trim()).filter(c => c);
+        } else if (componentsStr) {
+          campaignData.components = [componentsStr];
+        }
+      }
+
       return {
         type: 'campaign',
-        data: {
-          id: parts[1] || '',
-          name: parts[2] || 'Campaign',
-          description: parts.slice(3).join(':') || '',
-        },
+        data: campaignData,
       };
     }
     return { type: 'unknown', data: null };

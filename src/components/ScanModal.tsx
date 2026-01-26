@@ -17,7 +17,7 @@ import {Colors} from '../constants/Colors';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
-import {recordRewardScan} from '../services/customerRecord';
+import {recordRewardScan, recordCampaignScan} from '../services/customerRecord';
 
 // Check if browser supports native BarcodeDetector API
 const supportsBarcodeDetector = (): boolean => {
@@ -54,14 +54,7 @@ const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
   products: string[];
   pinCode?: string;
   businessId?: string;
-  business?: {
-    name: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    website?: string;
-    socialMedia?: any;
-  };
+  businessName?: string;
 } | null => {
   if (parsed.type === 'reward') {
     return {
@@ -72,7 +65,6 @@ const convertParsedQRToReward = (parsed: ReturnType<typeof parseQRCode>): {
       products: parsed.data.products,
       pinCode: parsed.data.pinCode,
       businessId: parsed.data.businessId,
-      business: parsed.data.business,
     };
   } else if (parsed.type === 'company') {
     // Convert company QR to reward-like format for compatibility
@@ -294,6 +286,168 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     }
   };
 
+  // Process scanned campaign QR code
+  const processCampaignQRCode = async (qrValue: string, parsed: ReturnType<typeof parseQRCode>) => {
+    if (parsed.type !== 'campaign' || !parsed.data) {
+      console.warn('[ScanModal] Invalid campaign QR code:', qrValue);
+      isProcessingRef.current = false;
+      Alert.alert('Invalid QR Code', 'This does not appear to be a valid campaign QR code.');
+      return;
+    }
+
+    const campaignData = parsed.data;
+    const campaignId = campaignData.id;
+    const campaignName = campaignData.name || 'Campaign';
+    const campaignDescription = campaignData.description || '';
+
+    try {
+      console.log('[ScanModal] Processing campaign QR code:', {
+        campaignId,
+        campaignName,
+        campaignDescription,
+      });
+
+      // Extract business_id and other campaign data from parsed QR code
+      let businessId = campaignData.businessId || 'default';
+      let businessName = campaignData.businessName;
+      
+      // If business info not in QR, try to get from member businesses
+      if (businessId === 'default' && !businessName) {
+        try {
+          const businesses = await loadBusinesses();
+          // Try to find business by campaign name or use first business
+          const foundBusiness = businesses.find(b => 
+            b.name.toLowerCase().includes(campaignName.toLowerCase()) ||
+            campaignName.toLowerCase().includes(b.name.toLowerCase())
+          );
+          if (foundBusiness) {
+            businessId = foundBusiness.id;
+            businessName = foundBusiness.name;
+          }
+        } catch (error) {
+          console.warn('[ScanModal] Could not load businesses:', error);
+        }
+      }
+
+      // Load existing rewards to check if campaign already exists
+      const existingRewards = await loadRewards();
+      let existingCampaign = existingRewards.find(
+        r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
+      );
+
+      // Get campaign points from QR code or use defaults
+      const pointsPerScan = campaignData.pointsPerScan || 1;
+      const pointsRequired = campaignData.pointsRequired || 5; // Default: 5 points required
+
+      // Record campaign scan using customer record service
+      console.log('[ScanModal] Recording campaign scan in customer record');
+      const { campaignProgress, isNewlyEarned } = await recordCampaignScan(
+        campaignId,
+        campaignName,
+        pointsPerScan,
+        pointsRequired,
+        businessId,
+        businessName,
+        qrValue
+      );
+
+      // Create or update campaign as a CustomerReward for carousel display
+      const campaignIcon = '🎯'; // Campaign icon
+      const campaignType = 'action';
+
+      if (existingCampaign) {
+        // Update existing campaign
+        existingCampaign.pointsEarned = campaignProgress.pointsEarned;
+        existingCampaign.count = Math.floor(campaignProgress.pointsEarned / pointsPerScan);
+        existingCampaign.total = Math.ceil(pointsRequired / pointsPerScan);
+        existingCampaign.isEarned = campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed';
+        existingCampaign.lastScannedAt = new Date().toISOString();
+
+        const updatedRewards = existingRewards.map(r =>
+          r.id === existingCampaign!.id ? existingCampaign! : r
+        );
+        await saveRewards(updatedRewards);
+
+        console.log('[ScanModal] Campaign updated:', existingCampaign.name);
+
+        // Stop camera/scanner
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+
+        // Show success message
+        Alert.alert(
+          'Campaign Updated!',
+          `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
+          [{text: 'OK', onPress: () => {
+            onClose();
+            setTimeout(() => {
+              onRewardScanned?.(existingCampaign!);
+            }, 100);
+          }}]
+        );
+      } else {
+        // Create new campaign entry
+        const newCampaign: CustomerReward = {
+          id: `campaign-${campaignId}`,
+          name: campaignName,
+          count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
+          total: Math.ceil(pointsRequired / pointsPerScan),
+          icon: campaignIcon,
+          type: campaignType,
+          requirement: Math.ceil(pointsRequired / pointsPerScan),
+          pointsPerPurchase: pointsPerScan,
+          rewardType: 'other',
+          qrCode: qrValue,
+          pointsEarned: campaignProgress.pointsEarned,
+          businessId: businessId !== 'default' ? businessId : undefined,
+          businessName: businessName,
+          isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
+          createdAt: new Date().toISOString(),
+          lastScannedAt: new Date().toISOString(),
+        };
+
+        console.log('[ScanModal] Creating new campaign:', {
+          id: newCampaign.id,
+          name: newCampaign.name,
+          pointsEarned: newCampaign.pointsEarned,
+          total: newCampaign.total,
+        });
+
+        const updatedRewards = [...existingRewards, newCampaign];
+        await saveRewards(updatedRewards);
+
+        // Verify the campaign was saved
+        const verifyRewards = await loadRewards();
+        const savedCampaign = verifyRewards.find(r => r.id === newCampaign.id);
+        if (savedCampaign) {
+          console.log('[ScanModal] ✅ New campaign confirmed in storage:', savedCampaign.name);
+        } else {
+          console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
+        }
+
+        // Stop camera/scanner
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+
+        // Show success message
+        Alert.alert(
+          'Campaign Added!',
+          `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
+          [{text: 'OK', onPress: () => {
+            onClose();
+            setTimeout(() => {
+              onRewardScanned?.(newCampaign);
+            }, 100);
+          }}]
+        );
+      }
+    } catch (error) {
+      console.error('[ScanModal] Error processing campaign QR code:', error);
+      isProcessingRef.current = false;
+      Alert.alert('Error', 'Failed to process campaign QR code. Please try again.');
+    }
+  };
+
   // Process scanned reward QR code
   const processRewardQRCode = async (qrValue: string) => {
     if (!qrValue || typeof qrValue !== 'string') {
@@ -336,6 +490,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     try {
       // Parse QR code using shared utility
       const parsed = parseQRCode(normalizedQr);
+      
+      // Handle campaign QR codes separately
+      if (parsed.type === 'campaign') {
+        await processCampaignQRCode(normalizedQr, parsed);
+        return;
+      }
+      
       const parsedReward = convertParsedQRToReward(parsed);
       
       if (!parsedReward || parsed.type === 'unknown') {
@@ -352,27 +513,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
       // Extract business ID from QR code (unique ID from registration/creation)
       const businessId = parsedReward.businessId || 'default';
-      let businessName = undefined;
-      if (parsedReward.business && parsedReward.business.name) {
-        businessName = parsedReward.business.name;
-        
-        // Create or update member business record
+      let businessName = parsedReward.businessName;
+      
+      // If business name not in QR, try to load from member businesses
+      if (!businessName && businessId !== 'default') {
         try {
-          const memberBusiness: MemberBusiness = {
-            id: businessId,
-            name: parsedReward.business.name,
-            address: parsedReward.business.address,
-            phone: parsedReward.business.phone,
-            email: parsedReward.business.email,
-            website: parsedReward.business.website,
-            socialMedia: parsedReward.business.socialMedia || {},
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          await addOrUpdateBusiness(memberBusiness);
-          console.log('[ScanModal] Member business record created/updated:', businessId);
+          const businesses = await loadBusinesses();
+          const foundBusiness = businesses.find(b => b.id === businessId);
+          if (foundBusiness) {
+            businessName = foundBusiness.name;
+          }
         } catch (businessError) {
-          console.error('[ScanModal] Error saving member business:', businessError);
+          console.error('[ScanModal] Error loading businesses:', businessError);
         }
       }
 
@@ -381,9 +533,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       
       // Use the new customer record service to track rewards properly
       // Get points per purchase from QR code (default: 1)
-      const pointsPerPurchase = parsed.type === 'reward' && parsed.data.pointsPerPurchase 
-        ? parsed.data.pointsPerPurchase 
-        : 1;
+      // Note: pointsPerPurchase is not in current ParsedRewardQR interface
+      // This would need to be added to the QR format if needed
+      const pointsPerPurchase = 1;
       const pointsToAdd = pointsPerPurchase; // Points earned per scan
       const requirement = parsedReward.requirement || 1; // Number of purchases/actions needed
       const totalPointsRequired = requirement * pointsPerPurchase; // Total points needed to earn reward
@@ -394,8 +546,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         pointsPerPurchase,
         requirement,
         totalPointsRequired,
-        businessName: parsedReward.business?.name,
-        businessLogo: parsedReward.business?.logo ? 'present' : 'missing',
+        businessName: businessName,
+        businessId: businessId,
       });
       
       // Record the scan in the structured customer record (handles active/earned/redeemed)
@@ -419,10 +571,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         existingReward.total = requirement; // Update total if changed
         existingReward.pointsPerPurchase = pointsPerPurchase; // Update points per purchase
         existingReward.isEarned = rewardProgress.pointsEarned >= (requirement * pointsPerPurchase);
-        // Update business logo if available
-        if (parsed.type === 'reward' && parsed.data.business?.logo && !existingReward.businessLogo) {
-          existingReward.businessLogo = parsed.data.business.logo;
-        }
+        // Business logo would come from QR code if available in future format
+        // For now, we'll skip logo updates for rewards
         // Update PIN code and business info if not already set
         if (parsedReward.pinCode && !existingReward.pinCode) {
           existingReward.pinCode = parsedReward.pinCode;
@@ -473,11 +623,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
         const type = parsedReward.products.length > 0 ? 'product' : 'action';
         
-        // Use business logo from QR code if available, otherwise random icon
-        const businessLogo = parsed.type === 'reward' && parsed.data.business?.logo 
-          ? parsed.data.business.logo 
-          : undefined;
-        const rewardIcon = businessLogo ? undefined : icons[Math.floor(Math.random() * icons.length)];
+        // Use random icon for reward (business logo would come from QR if available in future format)
+        const rewardIcon = icons[Math.floor(Math.random() * icons.length)];
         
         const newReward: CustomerReward = {
           id: parsedReward.id,
@@ -485,7 +632,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           count: Math.floor(rewardProgress.pointsEarned / pointsPerPurchase), // Current progress (e.g., 1 of 4)
           total: requirement, // Total purchases/actions needed (e.g., 4)
           icon: rewardIcon,
-          businessLogo: businessLogo, // Store business logo if available
           type: type,
           requirement: requirement,
           pointsPerPurchase: pointsPerPurchase, // Store points per purchase
@@ -495,7 +641,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           pointsEarned: rewardProgress.pointsEarned,
           pinCode: parsedReward.pinCode,
           businessId: businessId !== 'default' ? businessId : undefined,
-          businessName: businessName,
+          businessName: businessName || undefined,
           isEarned: rewardProgress.pointsEarned >= totalPointsRequired,
           createdAt: new Date().toISOString(), // Add timestamp so it appears in carousel
           lastScannedAt: new Date().toISOString(), // Track last scan time
