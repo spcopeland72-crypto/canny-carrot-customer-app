@@ -306,8 +306,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
 
-      let businessName: string | undefined;
-      if (businessId && businessId !== 'default') {
+      let businessName: string | undefined = (itemData.businessName || '').trim() || undefined;
+      if (!businessName && businessId && businessId !== 'default') {
         const biz = await fetchBusinessById(businessId);
         businessName = biz?.name;
       }
@@ -714,10 +714,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         if (parsedReward.pinCode && !existingReward.pinCode) {
           existingReward.pinCode = parsedReward.pinCode;
         }
-        if (businessId !== 'default' && !existingReward.businessId) {
-          existingReward.businessId = businessId;
-          existingReward.businessName = businessName;
-        }
+        if (businessId !== 'default') existingReward.businessId = businessId;
+        if (businessName != null) existingReward.businessName = businessName;
         
         const updatedRewards = existingRewards.map(r => 
           r.id === existingReward!.id ? existingReward! : r

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  SafeAreaView,
-  StatusBar,
+  Modal,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
@@ -34,27 +33,27 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
   const [congratulationsModalVisible, setCongratulationsModalVisible] = useState(false);
   const [selectedReward, setSelectedReward] = useState<CustomerReward | null>(null);
   const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<CustomerReward | null>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [rewardToDelete, setRewardToDelete] = useState<CustomerReward | null>(null);
+
+  const loadRewardsData = useCallback(async () => {
+    try {
+      const loadedRewards = await loadRewards();
+      const sorted = [...loadedRewards].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (bTime !== aTime) return bTime - aTime;
+        return b.id.localeCompare(a.id);
+      });
+      setRewards(sorted);
+    } catch (error) {
+      console.error('Error loading rewards:', error);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadRewardsData = async () => {
-      try {
-        const loadedRewards = await loadRewards();
-        console.log('[SeeAllRewardsPage] Loaded rewards:', loadedRewards.length, 'rewards');
-        // Sort by newest first (most recently created/scanned)
-        const sorted = [...loadedRewards].sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          if (bTime !== aTime) return bTime - aTime;
-          return b.id.localeCompare(a.id);
-        });
-        setRewards(sorted);
-        console.log('[SeeAllRewardsPage] Sorted rewards:', sorted.length, 'rewards');
-      } catch (error) {
-        console.error('Error loading rewards:', error);
-      }
-    };
     loadRewardsData();
-  }, [currentScreen]); // Reload when screen changes to this page
+  }, [currentScreen, loadRewardsData]);
 
   // Default example rewards if none loaded
   const defaultRewards: CustomerReward[] = [
@@ -136,9 +135,41 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
 
   const handleRedeemDotPress = (reward: CustomerReward, e: any) => {
     e.stopPropagation();
-    // Badge click opens Redeem modal for redemption
     setSelectedRewardForRedemption(reward);
     setRedeemModalVisible(true);
+  };
+
+  const handleDeletePress = (reward: CustomerReward, e: any) => {
+    e.stopPropagation();
+    setRewardToDelete(reward);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!rewardToDelete) return;
+    try {
+      const all = await loadRewards();
+      const updated = all.filter((r) => r.id !== rewardToDelete.id);
+      await saveRewards(updated);
+      const sorted = [...updated].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (bTime !== aTime) return bTime - aTime;
+        return b.id.localeCompare(a.id);
+      });
+      setRewards(sorted);
+      setDeleteModalVisible(false);
+      setRewardToDelete(null);
+    } catch (error) {
+      console.error('Error deleting reward:', error);
+      setDeleteModalVisible(false);
+      setRewardToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModalVisible(false);
+    setRewardToDelete(null);
   };
 
   return (
@@ -187,6 +218,17 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
                 </Text>
               )}
             </View>
+
+            {/* Delete bin icon — only when we have saved rewards */}
+            {rewards.length > 0 && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e) => handleDeletePress(reward, e)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={styles.deleteButtonIcon}>🗑️</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Arrow indicator */}
             <Text style={styles.arrow}>›</Text>
@@ -270,6 +312,36 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             message="Congratulations you have redeemed your reward"
             rewardName={selectedRewardForRedemption?.name}
           />
+
+          {/* Delete confirmation modal */}
+          <Modal
+            visible={deleteModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={cancelDelete}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.deleteModal}>
+                <Text style={styles.deleteModalTitle}>
+                  {rewardToDelete?.id.startsWith('campaign-') ? 'Delete Campaign?' : 'Delete Reward?'}
+                </Text>
+                <Text style={styles.deleteModalMessage}>
+                  Are you sure you want to delete "{rewardToDelete?.name}"? This action cannot be undone.
+                </Text>
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity
+                    style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                    onPress={cancelDelete}>
+                    <Text style={styles.deleteModalButtonTextCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.deleteModalButton, styles.deleteModalButtonDelete]}
+                    onPress={confirmDelete}>
+                    <Text style={styles.deleteModalButtonTextDelete}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </PageTemplate>
       );
     };
@@ -347,6 +419,68 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: Colors.text.light,
     marginLeft: 8,
+  },
+  deleteButton: {
+    padding: 8,
+    marginRight: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonIcon: {
+    fontSize: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  deleteModal: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 12,
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: Colors.text.secondary,
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  deleteModalButtonCancel: {
+    backgroundColor: Colors.neutral[200],
+    marginRight: 6,
+  },
+  deleteModalButtonDelete: {
+    backgroundColor: '#FF3B30',
+    marginLeft: 6,
+  },
+  deleteModalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  deleteModalButtonTextDelete: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
   },
 });
 

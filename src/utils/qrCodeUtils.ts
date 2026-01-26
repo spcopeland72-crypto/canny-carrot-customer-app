@@ -5,13 +5,15 @@
  * for reward codes, campaign codes, and business codes.
  * 
  * Formats:
- * - Reward: REWARD:{businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+ * - Reward: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
  * - Company: COMPANY:{number}:{name}
  * - Campaign: CAMPAIGN:{id}:{name}:{description}
+ * - Campaign item: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
  */
 
 export interface ParsedRewardQR {
   businessId?: string;
+  businessName?: string;
   id: string;
   name: string;
   requirement: number;
@@ -38,9 +40,10 @@ export interface ParsedCampaignQR {
 
 export interface ParsedCampaignItemQR {
   businessId: string;
-  campaignId: string; // Full campaign ID (includes business ID)
+  businessName?: string;
+  campaignId: string;
   campaignName: string;
-  itemType: string; // 'product' | 'action' | etc.
+  itemType: string;
   itemName: string;
   startDate: string;
   endDate: string;
@@ -124,18 +127,35 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle CAMPAIGN_ITEM QR codes (from business app)
-  // Format: CAMPAIGN_ITEM:{businessId}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
-  // businessId is UUID from registration (hashed from date + name), used in rewards/campaigns and for API lookup.
+  // Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
   if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
     const parts = normalizedQr.split(':');
+    if (parts.length >= 8) {
+      const businessId = (parts[1] || '').trim();
+      const businessName = (parts[2] || '').trim() || undefined;
+      const campaignName = parts[3] || 'Campaign';
+      return {
+        type: 'campaign_item',
+        data: {
+          businessId,
+          businessName,
+          campaignId: businessId,
+          campaignName,
+          itemType: parts[4] || 'product',
+          itemName: parts[5] || '',
+          startDate: parts[6] || '',
+          endDate: parts[7] || '',
+        },
+      };
+    }
     if (parts.length >= 7) {
-      const businessId = (parts[1] || '').trim(); // Full business UUID (e.g. business_1767744076082_i3d1uu42x)
+      const businessId = (parts[1] || '').trim();
       const campaignName = parts[2] || 'Campaign';
       return {
         type: 'campaign_item',
         data: {
           businessId,
-          campaignId: businessId, // same as businessId when not separate in QR
+          campaignId: businessId,
           campaignName,
           itemType: parts[3] || 'product',
           itemName: parts[4] || '',
@@ -197,23 +217,46 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle REWARD QR codes
-  // Format: REWARD:{businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
+  // Format: REWARD:{businessId}:{businessName}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
   if (normalizedQr.startsWith('REWARD:')) {
-    const withoutPrefix = normalizedQr.substring(7); // Remove 'REWARD:'
+    const withoutPrefix = normalizedQr.substring(7);
     const parts = withoutPrefix.split(':');
-    
+
+    if (parts.length >= 8) {
+      const businessId = parts[0] || '';
+      const businessName = (parts[1] || '').trim() || undefined;
+      const id = parts[2] || 'unknown';
+      const pinCode = parts[parts.length - 1] || '';
+      const productsStr = parts[parts.length - 2] || '';
+      const rewardType = parts[parts.length - 3] || 'free_product';
+      const requirement = parseInt(parts[parts.length - 4], 10) || 1;
+      const name = parts.slice(3, parts.length - 4).join(':') || 'Unnamed Reward';
+      const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
+
+      return {
+        type: 'reward',
+        data: {
+          businessId,
+          businessName,
+          id,
+          name,
+          requirement,
+          rewardType,
+          products,
+          pinCode,
+        },
+      };
+    }
     if (parts.length >= 7) {
-      // Format with businessId and PIN: {businessId}:{id}:{name}:{requirement}:{rewardType}:{products}:{pinCode}
       const businessId = parts[0] || '';
       const id = parts[1] || 'unknown';
       const pinCode = parts[parts.length - 1] || '';
       const productsStr = parts[parts.length - 2] || '';
       const rewardType = parts[parts.length - 3] || 'free_product';
       const requirement = parseInt(parts[parts.length - 4], 10) || 1;
-      // Everything between id and requirement is the name
       const name = parts.slice(2, parts.length - 4).join(':') || 'Unnamed Reward';
       const products = productsStr ? productsStr.split(',').filter(p => p.trim()) : [];
-      
+
       return {
         type: 'reward',
         data: {
@@ -227,8 +270,7 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
         },
       };
     }
-    
-    // Invalid format
+
     return { type: 'unknown', data: null };
   }
   
