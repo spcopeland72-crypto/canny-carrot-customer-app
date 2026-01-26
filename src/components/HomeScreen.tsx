@@ -18,6 +18,7 @@ import {Colors} from '../constants/Colors';
 import {getTimeBasedGreeting} from '../utils/timeGreeting';
 import Constants from 'expo-constants';
 import CircularProgress from './CircularProgress';
+import CampaignProgressCircle from './CampaignProgressCircle';
 import BottomNavigation from './BottomNavigation';
 // FindMoreRewardsModal removed - now using FindMoreRewardsPage
 import ScanModal from './ScanModal';
@@ -789,35 +790,56 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   {/* 1. Reward/campaign name on top */}
                   <Text style={styles.rewardTitle}>{card.title}</Text>
                   <View style={styles.rewardProgressContainer}>
-                    {card.id === '3' && onlineBlackImage && !onlineImageError ? (
-                      <View style={styles.onlineImageContainer}>
-                        <Image
-                          source={onlineBlackImage}
-                          style={styles.onlineImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.log('Online-black image failed to load');
-                            setOnlineImageError(true);
-                          }}
+                    {isCampaign ? (
+                      <>
+                        <CampaignProgressCircle
+                          earned={card.count}
+                          total={card.total}
+                          size={80}
                         />
-                      </View>
-                    ) : null}
-                    <CircularProgress
-                      key={`progress-${card.id}`}
-                      size={80}
-                      strokeWidth={6}
-                      progress={progress}
-                      color={isCampaign ? Colors.grey : Colors.secondary}
-                      backgroundColor={Colors.neutral[200]}
-                    />
-                    <View style={[
-                      styles.rewardIconOverlay,
-                      card.id === '2' && styles.rewardIconOverlayBlue,
-                      card.id === '3' && styles.rewardIconOverlayGreen,
-                      isCampaign && styles.rewardIconOverlayCampaign,
-                    ]}>
-                      {!isCampaign && (
-                        <>
+                        {isEarned && (
+                          <TouchableOpacity
+                            style={styles.redeemBadgeOverlay}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setSelectedRewardForRedemption(card);
+                              setRedeemModalVisible(true);
+                            }}
+                            activeOpacity={0.8}>
+                            <View style={styles.redeemBadge}>
+                              <Text style={styles.redeemBadgeText}>🎁</Text>
+                            </View>
+                          </TouchableOpacity>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {card.id === '3' && onlineBlackImage && !onlineImageError ? (
+                          <View style={styles.onlineImageContainer}>
+                            <Image
+                              source={onlineBlackImage}
+                              style={styles.onlineImage}
+                              resizeMode="contain"
+                              onError={() => {
+                                console.log('Online-black image failed to load');
+                                setOnlineImageError(true);
+                              }}
+                            />
+                          </View>
+                        ) : null}
+                        <CircularProgress
+                          key={`progress-${card.id}`}
+                          size={80}
+                          strokeWidth={6}
+                          progress={progress}
+                          color={Colors.secondary}
+                          backgroundColor={Colors.neutral[200]}
+                        />
+                        <View style={[
+                          styles.rewardIconOverlay,
+                          card.id === '2' && styles.rewardIconOverlayBlue,
+                          card.id === '3' && styles.rewardIconOverlayGreen,
+                        ]}>
                           {card.id === '1' && blackwellsLogo ? (
                             <Image
                               source={blackwellsLogo}
@@ -857,29 +879,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                           ) : (
                             <Text style={styles.rewardIcon}>{card.icon}</Text>
                           )}
-                        </>
-                      )}
-                      {isEarned && (
-                        <TouchableOpacity
-                          style={styles.redeemBadgeOverlay}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setSelectedRewardForRedemption(card);
-                            setRedeemModalVisible(true);
-                          }}
-                          activeOpacity={0.8}>
-                          <View style={styles.redeemBadge}>
-                            <Text style={styles.redeemBadgeText}>🎁</Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {/* Count / total in center (Canny Carrot green); campaigns: only this, no icon */}
-                    <View style={styles.rewardCountOverlay} pointerEvents="none">
-                      <Text style={styles.rewardCountText}>
-                        {card.count} / {card.total}
-                      </Text>
-                    </View>
+                          {isEarned && (
+                            <TouchableOpacity
+                              style={styles.redeemBadgeOverlay}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                setSelectedRewardForRedemption(card);
+                                setRedeemModalVisible(true);
+                              }}
+                              activeOpacity={0.8}>
+                              <View style={styles.redeemBadge}>
+                                <Text style={styles.redeemBadgeText}>🎁</Text>
+                              </View>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <View style={styles.rewardCountOverlay} pointerEvents="none">
+                          <Text style={styles.rewardCountText}>
+                            {card.count} / {card.total}
+                          </Text>
+                        </View>
+                      </>
+                    )}
                   </View>
                   {/* 3. Business name underneath — hide when same as title (campaign name used as businessName) */}
                   {card.businessName && card.businessName !== card.title ? (
