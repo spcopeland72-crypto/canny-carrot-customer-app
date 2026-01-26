@@ -18,6 +18,7 @@ import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorag
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
 import {recordRewardScan, recordCampaignScan} from '../services/customerRecord';
+import {fetchBusinessById} from '../services/businessApi';
 
 // Check if browser supports native BarcodeDetector API
 const supportsBarcodeDetector = (): boolean => {
@@ -298,13 +299,19 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     // Handle CAMPAIGN_ITEM format (from business app)
     if (parsed.type === 'campaign_item') {
       const itemData = parsed.data as any; // ParsedCampaignItemQR
-      const campaignId = itemData.campaignId || itemData.businessId || 'unknown';
+      const businessId = (itemData.businessId || '').trim() || 'default';
       const campaignName = itemData.campaignName || 'Campaign';
-      const businessId = itemData.businessId || 'default';
-      const businessName = undefined; // Don't use campaign name as business name — avoids duplicate name in carousel
+      const slug = campaignName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'campaign';
+      const campaignId = `${businessId}-${slug}`;
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
-      
+
+      let businessName: string | undefined;
+      if (businessId && businessId !== 'default') {
+        const biz = await fetchBusinessById(businessId);
+        businessName = biz?.name;
+      }
+
       // Default campaign points: 1 point per scan, 5 points required
       const pointsPerScan = 1;
       const pointsRequired = 5;
@@ -314,6 +321,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       let existingCampaign = existingRewards.find(
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
+
+      const key = `${itemType}:${itemName}`;
+      const alreadyCollected = existingCampaign?.collectedItems?.some(
+        (c) => `${c.itemType}:${c.itemName}` === key
+      );
+      if (alreadyCollected && itemName) {
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
+        Alert.alert('ERROR', "You have already won this point.");
+        return;
+      }
 
       // Record campaign scan using customer record service
       console.log('[ScanModal] Recording campaign item scan in customer record');
@@ -338,6 +357,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         existingCampaign.total = Math.ceil(pointsRequired / pointsPerScan);
         existingCampaign.isEarned = campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed';
         existingCampaign.lastScannedAt = new Date().toISOString();
+        if (businessId && businessId !== 'default') existingCampaign.businessId = businessId;
+        if (businessName != null) existingCampaign.businessName = businessName;
+        const prev = existingCampaign.collectedItems || [];
+        const key = `${itemType}:${itemName}`;
+        if (itemName && !prev.some((c) => `${c.itemType}:${c.itemName}` === key)) {
+          existingCampaign.collectedItems = [...prev, { itemType, itemName }];
+        }
 
         const updatedRewards = existingRewards.map(r =>
           r.id === existingCampaign!.id ? existingCampaign! : r
@@ -372,10 +398,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           qrCode: qrValue,
           pointsEarned: campaignProgress.pointsEarned,
           businessId: businessId !== 'default' ? businessId : undefined,
-          businessName: businessName,
+          businessName: businessName ?? undefined,
           isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
           createdAt: new Date().toISOString(),
           lastScannedAt: new Date().toISOString(),
+          collectedItems: itemName ? [{ itemType, itemName }] : [],
         };
 
         console.log('[ScanModal] Creating new campaign from CAMPAIGN_ITEM:', {

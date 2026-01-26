@@ -28,6 +28,8 @@ interface RewardQRCodeModalProps {
   count: number; // Points earned
   total: number; // Points needed
   businessName?: string;
+  /** Product/action label per circle (collected first, then "Remaining"). Length = total. */
+  circleLabels?: string[];
   onClose: () => void;
   onNavigate?: (screen: string) => void;
 }
@@ -38,13 +40,15 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   count,
   total,
   businessName,
+  circleLabels,
   onClose,
   onNavigate,
 }) => {
-  // Create array of circles - total circles, count have stamps
+  // Create array of circles - total circles, count have stamps; optional label per circle
   const circles = Array.from({length: total}, (_, index) => ({
     id: index,
     hasStamp: index < count,
+    label: circleLabels && circleLabels[index] ? String(circleLabels[index]) : undefined,
   }));
 
   const handleBusinessPage = () => {
@@ -73,10 +77,15 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{rewardName}</Text>
           
-          {/* Circles with stamps across the top */}
+          {/* Circles with stamps across the top; optional product/action label above each */}
           <View style={styles.circlesContainer}>
             {circles.map((circle) => (
               <View key={circle.id} style={styles.circleWrapper}>
+                {circle.label != null ? (
+                  <Text style={styles.circleLabel} numberOfLines={2}>
+                    {circle.label}
+                  </Text>
+                ) : null}
                 <View style={styles.circle}>
                   {circle.hasStamp && ccLogoImage ? (
                     <Image
@@ -147,6 +156,16 @@ const styles = StyleSheet.create({
   },
   circleWrapper: {
     margin: 4,
+    alignItems: 'center',
+    minWidth: 56,
+  },
+  circleLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginBottom: 4,
+    textAlign: 'center',
+    maxWidth: 70,
   },
   circle: {
     width: 50,

@@ -251,6 +251,8 @@ interface RewardCard {
   pinCode?: string; // PIN code for redemption
   qrCode?: string; // QR code value for display
   businessName?: string; // Business name
+  /** For campaigns: product/action labels per circle (collected first, then "Remaining") */
+  circleLabels?: string[];
 }
 
 interface GoodieCard {
@@ -279,6 +281,11 @@ interface HomeScreenProps {
     pointsEarned?: number;
     isEarned?: boolean;
     pinCode?: string;
+    createdAt?: string;
+    collectedItems?: { itemType: string; itemName: string }[];
+    businessLogo?: string;
+    qrCode?: string;
+    businessName?: string;
   }>;
 }
 
@@ -413,18 +420,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     : [];
   
   const rewardCards: RewardCard[] = sortedRewards.length > 0
-    ? sortedRewards.map(reward => ({
-        id: reward.id,
-        title: reward.name,
-        count: reward.count, // Current progress (e.g., 1 of 4)
-        total: reward.total, // Total needed (e.g., 4)
-        icon: reward.icon || '🎁',
-        image: reward.businessLogo ? { uri: reward.businessLogo } : undefined, // Use business logo if available
-        isEarned: reward.isEarned || false,
-        pinCode: reward.pinCode,
-        qrCode: reward.qrCode, // Include QR code for display
-        businessName: reward.businessName, // Business name
-      }))
+    ? sortedRewards.map(reward => {
+        const coll = reward.collectedItems || [];
+        const collectedLabels = coll.map((c: { itemType: string; itemName: string }) => c.itemName).filter(Boolean);
+        const total = reward.total || 0;
+        const count = reward.count || 0;
+        const filled = collectedLabels.slice(0, count);
+        const rest = Math.max(0, total - filled.length);
+        const circleLabels =
+          total > 0
+            ? [...filled, ...Array(rest).fill('Remaining')].slice(0, total)
+            : undefined;
+        return {
+          id: reward.id,
+          title: reward.name,
+          count: reward.count,
+          total: reward.total,
+          icon: reward.icon || '🎁',
+          image: reward.businessLogo ? { uri: reward.businessLogo } : undefined,
+          isEarned: reward.isEarned || false,
+          pinCode: reward.pinCode,
+          qrCode: reward.qrCode,
+          businessName: reward.businessName,
+          circleLabels,
+        };
+      })
     : [
         // Default sample data if no rewards loaded
         {id: '1', title: 'Blackwells Butchers', count: 8, total: 10, icon: '🥐', image: blackwellsLogo},
@@ -744,8 +764,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             contentContainerStyle={styles.carouselContent}>
             {rewardCards.map((card) => {
               const progress = ((card.total - card.count) / card.total) * 100;
-              // All circles use orange
-              const progressColor = Colors.secondary;
+              const isCampaign = card.id.startsWith('campaign-');
               const isEarned = card.isEarned || false;
               
               // Handler for reward card click
@@ -767,14 +786,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   key={card.id}
                   style={styles.rewardCard}
                   onPress={handleRewardPress}>
-                  {/* Business name at top */}
-                  {card.businessName && (
-                    <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
-                  )}
-                  {/* Reward name below business name */}
+                  {/* 1. Reward/campaign name on top */}
                   <Text style={styles.rewardTitle}>{card.title}</Text>
                   <View style={styles.rewardProgressContainer}>
-                    {/* Online-black.png image at top left corner of circle 3 */}
                     {card.id === '3' && onlineBlackImage && !onlineImageError ? (
                       <View style={styles.onlineImageContainer}>
                         <Image
@@ -793,13 +807,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       size={80}
                       strokeWidth={6}
                       progress={progress}
-                      color={progressColor}
+                      color={isCampaign ? Colors.grey : Colors.secondary}
                       backgroundColor={Colors.neutral[200]}
                     />
                     <View style={[
                       styles.rewardIconOverlay,
                       card.id === '2' && styles.rewardIconOverlayBlue,
-                      card.id === '3' && styles.rewardIconOverlayGreen
+                      card.id === '3' && styles.rewardIconOverlayGreen,
+                      isCampaign && styles.rewardIconOverlayCampaign,
                     ]}>
                       {card.id === '1' && blackwellsLogo ? (
                         <Image
@@ -840,13 +855,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       ) : (
                         <Text style={styles.rewardIcon}>{card.icon}</Text>
                       )}
-                      {/* Redemption badge overlay when reward is earned */}
                       {isEarned && (
                         <TouchableOpacity
                           style={styles.redeemBadgeOverlay}
                           onPress={(e) => {
                             e.stopPropagation();
-                            // Badge click opens Redeem modal for redemption
                             setSelectedRewardForRedemption(card);
                             setRedeemModalVisible(true);
                           }}
@@ -857,11 +870,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         </TouchableOpacity>
                       )}
                     </View>
+                    {/* Count / total in center of icon (Canny Carrot green) */}
+                    <View style={styles.rewardCountOverlay} pointerEvents="none">
+                      <Text style={styles.rewardCountText}>
+                        {card.count} / {card.total}
+                      </Text>
+                    </View>
                   </View>
-                  {/* Points count below icon - e.g., "4 out of 5" */}
-                  <Text style={styles.rewardCount}>
-                    {card.count} out of {card.total}
-                  </Text>
+                  {/* 3. Business name underneath */}
+                  {card.businessName ? (
+                    <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
+                  ) : null}
                 </TouchableOpacity>
               );
             })}
@@ -1180,6 +1199,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         count={selectedRewardForQR?.count || 0}
         total={selectedRewardForQR?.total || 0}
         businessName={selectedRewardForQR?.businessName}
+        circleLabels={selectedRewardForQR?.circleLabels}
         onClose={() => setRewardQRModalVisible(false)}
         onNavigate={onNavigate}
       />
@@ -1501,6 +1521,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  rewardCountOverlay: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: 80,
+  },
+  rewardCountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.accent,
+  },
   onlineImageContainer: {
     position: 'absolute',
     top: -5, // Position at top left corner of the circle (slightly offset for visibility)
@@ -1527,6 +1559,9 @@ const styles = StyleSheet.create({
   },
   rewardIconOverlayGreen: {
     backgroundColor: '#1B5E20', // Dark green to match The Green Florist logo
+  },
+  rewardIconOverlayCampaign: {
+    backgroundColor: Colors.grey, // Canny Carrot grey for campaigns
   },
   rewardIcon: {
     fontSize: 32,

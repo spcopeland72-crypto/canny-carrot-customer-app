@@ -3,9 +3,9 @@
  */
 export const Colors = {
   primary: '#0E7C86',
-  secondary: '#FF7A18', // Canny Carrot Orange
-  accent: '#4CAF50',
-  grey: '#737373',
+  secondary: '#FF7A18', // Canny Carrot Orange (rewards)
+  accent: '#4CAF50', // Canny Carrot Green (count/total numbers)
+  grey: '#737373', // Canny Carrot Grey (campaigns)
   neutral: {
     50: '#fafafa',
     100: '#f5f5f5',

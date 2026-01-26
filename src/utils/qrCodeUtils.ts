@@ -125,26 +125,18 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   
   // Handle CAMPAIGN_ITEM QR codes (from business app)
   // Format: CAMPAIGN_ITEM:{businessId}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+  // businessId is UUID from registration (hashed from date + name), used in rewards/campaigns and for API lookup.
   if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
     const parts = normalizedQr.split(':');
     if (parts.length >= 7) {
-      const campaignId = parts[1] || ''; // Full campaign ID (e.g., business_1767744076082_i3d1uu42x)
-      // Extract business ID from campaign ID (format: business_xxx or business_xxx_yyy)
-      let businessId = campaignId;
-      if (campaignId.startsWith('business_')) {
-        // Extract just the business part (business_1767744076082)
-        const businessMatch = campaignId.match(/^(business_\d+)/);
-        if (businessMatch) {
-          businessId = businessMatch[1];
-        }
-      }
-      
+      const businessId = (parts[1] || '').trim(); // Full business UUID (e.g. business_1767744076082_i3d1uu42x)
+      const campaignName = parts[2] || 'Campaign';
       return {
         type: 'campaign_item',
         data: {
-          businessId: businessId,
-          campaignId: campaignId,
-          campaignName: parts[2] || 'Campaign',
+          businessId,
+          campaignId: businessId, // same as businessId when not separate in QR
+          campaignName,
           itemType: parts[3] || 'product',
           itemName: parts[4] || '',
           startDate: parts[5] || '',
