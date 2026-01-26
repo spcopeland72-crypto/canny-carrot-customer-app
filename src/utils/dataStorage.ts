@@ -92,6 +92,8 @@ export interface CustomerReward {
   createdAt?: string; // When reward was first scanned (for sorting)
   lastScannedAt?: string; // Track last scan time
   isEarned?: boolean; // Whether reward has been earned (points requirement met)
+  /** For campaigns: which products/actions collected (for modal labels and duplicate detection) */
+  collectedItems?: { itemType: string; itemName: string }[];
 }
 
 export const saveRewards = async (rewards: CustomerReward[]): Promise<void> => {

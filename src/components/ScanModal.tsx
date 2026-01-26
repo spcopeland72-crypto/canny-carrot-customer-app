@@ -301,7 +301,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const campaignId = itemData.campaignId || itemData.businessId || 'unknown';
       const campaignName = itemData.campaignName || 'Campaign';
       const businessId = itemData.businessId || 'default';
-      const businessName = itemData.campaignName || undefined; // Use campaign name as business name fallback
+      const businessName = undefined; // Don't use campaign name as business name — avoids duplicate name in carousel
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
       
@@ -346,19 +346,15 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
-        // Stop camera/scanner
+        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-
-        // Show success message
+        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
           [{text: 'OK', onPress: () => {
-            onClose();
-            setTimeout(() => {
-              onRewardScanned?.(existingCampaign!);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
           }}]
         );
       } else {
@@ -401,19 +397,15 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
         }
 
-        // Stop camera/scanner
+        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-
-        // Show success message
+        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
           [{text: 'OK', onPress: () => {
-            onClose();
-            setTimeout(() => {
-              onRewardScanned?.(newCampaign);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(newCampaign), 100);
           }}]
         );
       }
@@ -496,19 +488,15 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
-        // Stop camera/scanner
+        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-
-        // Show success message
+        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
           [{text: 'OK', onPress: () => {
-            onClose();
-            setTimeout(() => {
-              onRewardScanned?.(existingCampaign!);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
           }}]
         );
       } else {
@@ -551,19 +539,15 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
         }
 
-        // Stop camera/scanner
+        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-
-        // Show success message
+        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
           [{text: 'OK', onPress: () => {
-            onClose();
-            setTimeout(() => {
-              onRewardScanned?.(newCampaign);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(newCampaign), 100);
           }}]
         );
       }
@@ -721,28 +705,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
         }
         
-        // Stop camera/scanner immediately before showing Alert
+        // Stop camera/scanner, close modal, then show success (same as campaign flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-        
-        // Call onRewardEarned callback if reward was newly earned
+        onClose();
         if (isNewlyEarned) {
-          setTimeout(() => {
-            onRewardEarned?.(existingReward!);
-          }, 100);
+          setTimeout(() => onRewardEarned?.(existingReward!), 100);
         }
-        
-        // Show reward point earned message
         Alert.alert(
           'Success, you earned a point!',
           `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
           [{text: 'OK', onPress: () => {
-            // Close modal after user dismisses alert
-            onClose();
-            // Call callback to reload rewards and return to home
-            setTimeout(() => {
-              onRewardScanned?.(existingReward!);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(existingReward!), 100);
           }}]
         );
       } else {
@@ -797,28 +771,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
         }
         
-        // Stop camera/scanner immediately before showing Alert
+        // Stop camera/scanner, close modal, then show success (same as campaign flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
-        
-        // Call onRewardEarned callback if reward was newly earned
+        onClose();
         if (isNewlyEarned) {
-          setTimeout(() => {
-            onRewardEarned?.(newReward);
-          }, 100);
+          setTimeout(() => onRewardEarned?.(newReward), 100);
         }
-        
-        // Show reward point earned message
         Alert.alert(
           'Success, you earned a point!',
           `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
           [{text: 'OK', onPress: () => {
-            // Close modal after user dismisses alert
-            onClose();
-            // Call callback to reload rewards and return to home
-            setTimeout(() => {
-              onRewardScanned?.(newReward);
-            }, 100);
+            setTimeout(() => onRewardScanned?.(newReward), 100);
           }}]
         );
       }

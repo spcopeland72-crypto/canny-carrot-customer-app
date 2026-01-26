@@ -224,3 +224,8 @@ The customer app implementation **significantly modified** the CodePen code:
 
 The core scrolling mechanism is preserved, but the visual appearance and implementation method are different.
 
+
+
+
+
+
