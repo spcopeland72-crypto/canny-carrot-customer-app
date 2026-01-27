@@ -370,9 +370,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         const total = reward.total || 0;
         const products = reward.selectedProducts || [];
         const actions = reward.selectedActions || [];
+        const collected = (reward.collectedItems || []).map((c: { itemType: string; itemName: string }) => c.itemName);
+        const fromQr = [...products, ...actions];
         const circleLabels =
           total > 0
-            ? [...products, ...actions].slice(0, total)
+            ? (fromQr.length >= total
+                ? fromQr.slice(0, total)
+                : [...collected, ...fromQr.filter((n) => !collected.includes(n))].slice(0, total))
             : undefined;
         let businessId = reward.businessId;
         if (!businessId && reward.id.startsWith('campaign-')) {

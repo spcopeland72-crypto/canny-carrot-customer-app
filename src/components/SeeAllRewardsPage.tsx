@@ -180,11 +180,17 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             count={selectedReward?.count ?? 0}
             total={selectedReward?.total ?? 0}
             businessName={selectedReward?.businessName}
-            circleLabels={
-              selectedReward && (selectedReward.total ?? 0) > 0
-                ? [...(selectedReward.selectedProducts || []), ...(selectedReward.selectedActions || [])].slice(0, selectedReward.total ?? 0)
-                : undefined
-            }
+            circleLabels={(() => {
+              if (!selectedReward || (selectedReward.total ?? 0) <= 0) return undefined;
+              const total = selectedReward.total ?? 0;
+              const products = selectedReward.selectedProducts || [];
+              const actions = selectedReward.selectedActions || [];
+              const collected = (selectedReward.collectedItems || []).map((c: { itemType: string; itemName: string }) => c.itemName);
+              const fromQr = [...products, ...actions];
+              return fromQr.length >= total
+                ? fromQr.slice(0, total)
+                : [...collected, ...fromQr.filter((n) => !collected.includes(n))].slice(0, total);
+            })()}
             onClose={() => setRewardQRModalVisible(false)}
             onNavigate={onNavigate}
           />
