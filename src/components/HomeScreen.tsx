@@ -17,7 +17,6 @@ import {
 import {Colors} from '../constants/Colors';
 import {getTimeBasedGreeting} from '../utils/timeGreeting';
 import Constants from 'expo-constants';
-import CircularProgress from './CircularProgress';
 import CampaignProgressCircle from './CampaignProgressCircle';
 import BottomNavigation from './BottomNavigation';
 // FindMoreRewardsModal removed - now using FindMoreRewardsPage
@@ -716,19 +715,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.carouselContent}>
             {rewardCards.map((card) => {
-              const progress = ((card.total - card.count) / card.total) * 100;
-              const isCampaign = card.id.startsWith('campaign-');
               const isEarned = card.isEarned || false;
+              const total = Math.max(1, card.total || 1);
+              const earned = Math.min(card.count || 0, total);
               
-              // Handler for reward card click
-              // If earned, show Redeem modal for redemption; otherwise show QR code
+              // Handler: same as campaign — if earned, Redeem modal; else QR modal
               const handleRewardPress = () => {
                 if (isEarned) {
-                  // Reward is earned - open Redeem modal for redemption
                   setSelectedRewardForRedemption(card);
                   setRedeemModalVisible(true);
                 } else {
-                  // Reward not yet earned - show QR code
                   setSelectedRewardForQR(card);
                   setRewardQRModalVisible(true);
                 }
@@ -739,75 +735,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   key={card.id}
                   style={styles.rewardCard}
                   onPress={handleRewardPress}>
-                  {/* 1. Reward/campaign name on top */}
                   <Text style={styles.rewardTitle}>{card.title}</Text>
                   <View style={styles.rewardProgressContainer}>
-                    {isCampaign ? (
-                      <>
-                        <CampaignProgressCircle
-                          earned={card.count}
-                          total={card.total}
-                          size={80}
-                        />
-                        {isEarned && (
-                          <TouchableOpacity
-                            style={styles.redeemBadgeOverlay}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setSelectedRewardForRedemption(card);
-                              setRedeemModalVisible(true);
-                            }}
-                            activeOpacity={0.8}>
-                            <View style={styles.redeemBadge}>
-                              <Text style={styles.redeemBadgeText}>🎁</Text>
-                            </View>
-                          </TouchableOpacity>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <CircularProgress
-                          key={`progress-${card.id}`}
-                          size={80}
-                          strokeWidth={6}
-                          progress={progress}
-                          color={Colors.secondary}
-                          backgroundColor={Colors.neutral[200]}
-                        />
-                        <View style={styles.rewardIconOverlay}>
-                          {card.image?.uri ? (
-                            <Image
-                              source={card.image}
-                              style={styles.rewardImage}
-                              resizeMode="contain"
-                            />
-                          ) : (
-                            <Text style={styles.rewardIcon}>{card.icon}</Text>
-                          )}
-                          {isEarned && (
-                            <TouchableOpacity
-                              style={styles.redeemBadgeOverlay}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                setSelectedRewardForRedemption(card);
-                                setRedeemModalVisible(true);
-                              }}
-                              activeOpacity={0.8}>
-                              <View style={styles.redeemBadge}>
-                                <Text style={styles.redeemBadgeText}>🎁</Text>
-                              </View>
-                            </TouchableOpacity>
-                          )}
+                    <CampaignProgressCircle
+                      earned={earned}
+                      total={total}
+                      size={80}
+                    />
+                    {isEarned && (
+                      <TouchableOpacity
+                        style={styles.redeemBadgeOverlay}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setSelectedRewardForRedemption(card);
+                          setRedeemModalVisible(true);
+                        }}
+                        activeOpacity={0.8}>
+                        <View style={styles.redeemBadge}>
+                          <Text style={styles.redeemBadgeText}>🎁</Text>
                         </View>
-                        <View style={styles.rewardCountOverlay} pointerEvents="none">
-                          <Text style={styles.rewardCountText}>
-                            {card.count} / {card.total}
-                          </Text>
-                        </View>
-                      </>
+                      </TouchableOpacity>
                     )}
                   </View>
-                  {/* 3. Business name underneath — hide when same as title (campaign name used as businessName) */}
                   {card.businessName && card.businessName !== card.title ? (
                     <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
                   ) : null}
@@ -1454,19 +1403,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rewardCountOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 80,
-    height: 80,
-    zIndex: 10,
-  },
-  rewardCountText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.accent,
-  },
   onlineImageContainer: {
     position: 'absolute',
     top: -5, // Position at top left corner of the circle (slightly offset for visibility)
@@ -1478,30 +1414,6 @@ const styles = StyleSheet.create({
   onlineImage: {
     width: 40,
     height: 40,
-  },
-  rewardIconOverlay: {
-    position: 'absolute',
-    width: 68, // Smaller than 80 to show the progress ring around it
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rewardIconOverlayCampaign: {
-    backgroundColor: Colors.grey, // Canny Carrot grey for campaigns
-  },
-  rewardIcon: {
-    fontSize: 32,
-  },
-  rewardImage: {
-    width: 60,
-    height: 60,
-  },
-  rewardCount: {
-    fontSize: 11,
-    color: Colors.text.secondary,
-    textAlign: 'center',
   },
   redeemDotIndicator: {
     position: 'absolute',

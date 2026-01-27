@@ -385,13 +385,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        Alert.alert(
-          'Campaign Updated!',
-          `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
-          }}]
-        );
+        setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Campaign Updated!',
+            `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
+            [{text: 'OK'}]
+          );
+        }, 100);
       } else {
         const newCampaign: CustomerReward = {
           id: `campaign-${campaignId}`,
@@ -438,13 +439,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        Alert.alert(
-          'Campaign Added!',
-          `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(newCampaign), 100);
-          }}]
-        );
+        setTimeout(() => onRewardScanned?.(newCampaign), 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Campaign Added!',
+            `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
+            [{text: 'OK'}]
+          );
+        }, 100);
       }
       return;
     }
@@ -528,13 +530,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        Alert.alert(
-          'Campaign Updated!',
-          `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
-          }}]
-        );
+        setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Campaign Updated!',
+            `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
+            [{text: 'OK'}]
+          );
+        }, 100);
       } else {
         // Create new campaign entry
         const newCampaign: CustomerReward = {
@@ -578,13 +581,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        Alert.alert(
-          'Campaign Added!',
-          `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(newCampaign), 100);
-          }}]
-        );
+        setTimeout(() => onRewardScanned?.(newCampaign), 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Campaign Added!',
+            `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
+            [{text: 'OK'}]
+          );
+        }, 100);
       }
     } catch (error) {
       console.error('[ScanModal] Error processing campaign QR code:', error);
@@ -673,6 +677,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
       }
 
+      // Load existing rewards; match by unique id or qrCode only (same as campaign). No pattern match by businessId/name.
       const existingRewards = await loadRewards();
       let existingReward = existingRewards.find(r => r.id === parsedReward.id || r.qrCode === normalizedQr);
       
@@ -793,34 +798,47 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           businessName: newReward.businessName,
         });
         
-        const updatedRewards = [...existingRewards, newReward];
+        // Re-check before create (same as campaign): avoid duplicate if we missed on first load (e.g. race).
+        const recheck = await loadRewards();
+        const found = recheck.find(r => r.id === newReward.id || r.qrCode === newReward.qrCode);
+        if (found) {
+          const existingPointsPerPurchase = found.pointsPerPurchase || 1;
+          found.pointsEarned = rewardProgress.pointsEarned;
+          found.count = Math.floor(rewardProgress.pointsEarned / existingPointsPerPurchase);
+          found.total = requirement;
+          found.pointsPerPurchase = pointsPerPurchase;
+          found.isEarned = rewardProgress.pointsEarned >= (requirement * pointsPerPurchase);
+          if (parsedReward.pinCode && !found.pinCode) found.pinCode = parsedReward.pinCode;
+          if (businessId !== 'default') found.businessId = businessId;
+          if (businessName != null) found.businessName = businessName;
+          if (parsedReward.products && parsedReward.products.length > 0) found.selectedProducts = parsedReward.products;
+          const updatedRewards = recheck.map(r => r.id === found.id ? found : r);
+          await saveRewards(updatedRewards);
+          isProcessingRef.current = false;
+          await stopCameraAndScanner();
+          onClose();
+          if (isNewlyEarned) setTimeout(() => onRewardEarned?.(found), 100);
+          Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK', onPress: () => { setTimeout(() => onRewardScanned?.(found), 100); }}]);
+          return;
+        }
+        
+        // Dedupe by id/qrCode (same as campaign): never persist two rewards with same id or qrCode.
+        const filtered = existingRewards.filter(r => r.id !== newReward.id && r.qrCode !== newReward.qrCode);
+        const updatedRewards = [...filtered, newReward];
         await saveRewards(updatedRewards);
         console.log('[ScanModal] Reward saved successfully, total rewards:', updatedRewards.length);
         
-        // Verify the reward was saved by reloading
         const verifyRewards = await loadRewards();
         console.log('[ScanModal] Verified saved rewards:', verifyRewards.length, 'rewards found');
         const savedReward = verifyRewards.find(r => r.id === newReward.id);
-        if (savedReward) {
-          console.log('[ScanModal] ✅ New reward confirmed in storage:', savedReward.name);
-        } else {
-          console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
-        }
+        if (savedReward) console.log('[ScanModal] ✅ New reward confirmed in storage:', savedReward.name);
+        else console.warn('[ScanModal] ⚠️ New reward NOT found in storage after save!');
         
-        // Stop camera/scanner, close modal, then show success (same as campaign flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        if (isNewlyEarned) {
-          setTimeout(() => onRewardEarned?.(newReward), 100);
-        }
-        Alert.alert(
-          'Success, you earned a point!',
-          `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(newReward), 100);
-          }}]
-        );
+        if (isNewlyEarned) setTimeout(() => onRewardEarned?.(newReward), 100);
+        Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK', onPress: () => { setTimeout(() => onRewardScanned?.(newReward), 100); }}]);
       }
     } catch (error) {
       console.error('Error processing reward QR code:', error);

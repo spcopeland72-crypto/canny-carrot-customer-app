@@ -94,12 +94,8 @@ export interface CustomerCampaignProgress {
   scanHistory: {
     timestamp: string;
     pointsAwarded: number;
-    itemType?: string;
-    itemName?: string;
   }[];
-  /** Which products/actions have been collected (for duplicate detection and modal labels) */
-  collectedItems?: { itemType: string; itemName: string }[];
-
+  
   // Campaign details (cached)
   campaignDescription?: string;
   startDate?: string;
