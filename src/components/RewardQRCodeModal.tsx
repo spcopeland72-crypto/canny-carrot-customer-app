@@ -168,6 +168,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: Colors.background,
     borderRadius: 16,
+    borderWidth: 3,
+    borderColor: Colors.secondary,
     padding: 24,
     width: '85%',
     maxWidth: 400,
