@@ -741,6 +741,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       earned={earned}
                       total={total}
                       size={80}
+                      circleColor={card.id.startsWith('campaign-') ? '#4AE261' : undefined}
                     />
                     {isEarned && (
                       <TouchableOpacity
@@ -1060,9 +1061,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       <CongratulationsModal
         visible={congratulationsModalVisible}
         onClose={() => {
+          const wasRedeemed = congratulationsContext === 'redeemed';
           setCongratulationsModalVisible(false);
           setSelectedRewardForRedemption(null);
           setCongratulationsContext('earned');
+          if (wasRedeemed) {
+            onNavigate('Search');
+            setTimeout(() => onNavigate('Home'), 100);
+          }
         }}
         message={congratulationsContext === 'redeemed'
           ? `Congratulations you have redeemed your reward`

@@ -41,12 +41,15 @@ export interface CampaignProgressCircleProps {
   earned: number;
   total: number;
   size?: number;
+  /** Centre circle colour. Campaign: #4AE261 (canny carrot green); reward: grey (default). */
+  circleColor?: string;
 }
 
 export default function CampaignProgressCircle({
   earned,
   total,
   size = 80,
+  circleColor = Colors.grey,
 }: CampaignProgressCircleProps) {
   const cx = size / 2;
   const cy = size / 2;
@@ -77,7 +80,7 @@ export default function CampaignProgressCircle({
         {paths.map((p, i) => (
           <Path key={i} d={p.d} fill={p.fill} />
         ))}
-        <Circle cx={cx} cy={cy} r={greyR} fill={Colors.grey} />
+        <Circle cx={cx} cy={cy} r={greyR} fill={circleColor} />
       </Svg>
       <View style={[styles.labelWrap, { width: size, height: size }]} pointerEvents="none">
         <Text style={[styles.label, { fontSize }]}>

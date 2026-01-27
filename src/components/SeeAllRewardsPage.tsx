@@ -271,6 +271,7 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             onClose={() => {
               setCongratulationsModalVisible(false);
               setSelectedRewardForRedemption(null);
+              loadRewardsData();
             }}
             message="Congratulations you have redeemed your reward"
             rewardName={selectedRewardForRedemption?.name}
