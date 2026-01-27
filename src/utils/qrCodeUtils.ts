@@ -131,21 +131,21 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   
   // Handle CAMPAIGN_ITEM QR codes (from business app)
   // Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
-  // productsPart/actionsPart: ||-joined. Required; no legacy format.
+  // productsPart/actionsPart are always the LAST two segments (||-joined). Use that so colons in names don't break parsing.
   if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
     const parts = normalizedQr.split(':');
     if (parts.length >= 10) {
+      const actionsPart = (parts[parts.length - 1] || '').trim();
+      const productsPart = (parts[parts.length - 2] || '').trim();
+      const allProducts = productsPart ? productsPart.split('||').map((p) => p.trim()).filter(Boolean) : [];
+      const allActions = actionsPart ? actionsPart.split('||').map((a) => a.trim()).filter(Boolean) : [];
       const businessId = (parts[1] || '').trim();
       const businessName = (parts[2] || '').trim() || undefined;
-      const campaignName = parts[3] || 'Campaign';
-      const itemType = parts[4] || 'product';
-      const itemName = parts[5] || '';
-      const startDate = parts[6] || '';
-      const endDate = parts[7] || '';
-      const productsStr = (parts[8] || '').trim();
-      const actionsStr = (parts[9] || '').trim();
-      const allProducts = productsStr ? productsStr.split('||').map((p) => p.trim()).filter(Boolean) : [];
-      const allActions = actionsStr ? actionsStr.split('||').map((a) => a.trim()).filter(Boolean) : [];
+      const campaignName = parts.length > 10 ? parts.slice(3, parts.length - 6).join(':').trim() || 'Campaign' : (parts[3] || 'Campaign');
+      const itemType = (parts[parts.length - 6] || 'product').trim();
+      const itemName = (parts[parts.length - 5] || '').trim();
+      const startDate = (parts[parts.length - 4] || '').trim();
+      const endDate = (parts[parts.length - 3] || '').trim();
       return {
         type: 'campaign_item',
         data: {
