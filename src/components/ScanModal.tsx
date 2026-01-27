@@ -309,9 +309,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const startDate = (itemData.startDate || '').trim() || undefined;
       const endDate = (itemData.endDate || '').trim() || undefined;
 
-      // Default campaign points: 1 point per scan, 5 points required
+      const allProducts = (itemData.allProducts || []).filter((p: string) => p?.trim());
+      const allActions = (itemData.allActions || []).filter((a: string) => a?.trim());
+      const totalFromQr = allProducts.length + allActions.length;
       const pointsPerScan = 1;
-      const pointsRequired = 5;
+      const pointsRequired = totalFromQr;
+      if (pointsRequired === 0) {
+        isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
+        Alert.alert('Invalid QR', 'Campaign has no products or actions.');
+        return;
+      }
 
       // Load existing rewards to check if campaign already exists
       const existingRewards = await loadRewards();
@@ -358,18 +367,12 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         existingCampaign.businessName = businessName ?? undefined;
         if (startDate != null) existingCampaign.startDate = startDate;
         if (endDate != null) existingCampaign.endDate = endDate;
+        existingCampaign.selectedProducts = [...allProducts];
+        existingCampaign.selectedActions = [...allActions];
         const prev = existingCampaign.collectedItems || [];
         const key = `${itemType}:${itemName}`;
         if (itemName && !prev.some((c) => `${c.itemType}:${c.itemName}` === key)) {
           existingCampaign.collectedItems = [...prev, { itemType, itemName }];
-          const prods = existingCampaign.selectedProducts || [];
-          const acts = existingCampaign.selectedActions || [];
-          if (itemType === 'product' && !prods.includes(itemName)) {
-            existingCampaign.selectedProducts = [...prods, itemName];
-          }
-          if (itemType === 'action' && !acts.includes(itemName)) {
-            existingCampaign.selectedActions = [...acts, itemName];
-          }
         }
 
         const updatedRewards = existingRewards.map(r =>
@@ -391,7 +394,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           }}]
         );
       } else {
-        // Create new campaign entry
         const newCampaign: CustomerReward = {
           id: `campaign-${campaignId}`,
           name: campaignName,
@@ -408,8 +410,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           businessName: businessName ?? undefined,
           startDate,
           endDate,
-          selectedProducts: itemType === 'product' && itemName ? [itemName] : [],
-          selectedActions: itemType === 'action' && itemName ? [itemName] : [],
+          selectedProducts: [...allProducts],
+          selectedActions: [...allActions],
           isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
           createdAt: new Date().toISOString(),
           lastScannedAt: new Date().toISOString(),

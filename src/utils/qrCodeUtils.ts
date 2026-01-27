@@ -47,6 +47,9 @@ export interface ParsedCampaignItemQR {
   itemName: string;
   startDate: string;
   endDate: string;
+  /** All campaign products (from QR when present). */
+  allProducts: string[];
+  allActions: string[];
 }
 
 export type ParsedQR = 
@@ -127,13 +130,22 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle CAMPAIGN_ITEM QR codes (from business app)
-  // Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}
+  // Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
+  // productsPart/actionsPart: ||-joined. Required; no legacy format.
   if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
     const parts = normalizedQr.split(':');
-    if (parts.length >= 8) {
+    if (parts.length >= 10) {
       const businessId = (parts[1] || '').trim();
       const businessName = (parts[2] || '').trim() || undefined;
       const campaignName = parts[3] || 'Campaign';
+      const itemType = parts[4] || 'product';
+      const itemName = parts[5] || '';
+      const startDate = parts[6] || '';
+      const endDate = parts[7] || '';
+      const productsStr = (parts[8] || '').trim();
+      const actionsStr = (parts[9] || '').trim();
+      const allProducts = productsStr ? productsStr.split('||').map((p) => p.trim()).filter(Boolean) : [];
+      const allActions = actionsStr ? actionsStr.split('||').map((a) => a.trim()).filter(Boolean) : [];
       return {
         type: 'campaign_item',
         data: {
@@ -141,26 +153,12 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
           businessName,
           campaignId: businessId,
           campaignName,
-          itemType: parts[4] || 'product',
-          itemName: parts[5] || '',
-          startDate: parts[6] || '',
-          endDate: parts[7] || '',
-        },
-      };
-    }
-    if (parts.length >= 7) {
-      const businessId = (parts[1] || '').trim();
-      const campaignName = parts[2] || 'Campaign';
-      return {
-        type: 'campaign_item',
-        data: {
-          businessId,
-          campaignId: businessId,
-          campaignName,
-          itemType: parts[3] || 'product',
-          itemName: parts[4] || '',
-          startDate: parts[5] || '',
-          endDate: parts[6] || '',
+          itemType,
+          itemName,
+          startDate,
+          endDate,
+          allProducts,
+          allActions,
         },
       };
     }
