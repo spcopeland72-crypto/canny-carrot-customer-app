@@ -20,12 +20,14 @@ interface SeeAllRewardsPageProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onBack?: () => void;
+  onViewBusinessPage?: (businessName: string, businessId?: string) => void;
 }
 
 const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
   currentScreen,
   onNavigate,
   onBack,
+  onViewBusinessPage,
 }) => {
   const [rewards, setRewards] = useState<CustomerReward[]>([]);
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
@@ -180,19 +182,35 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             count={selectedReward?.count ?? 0}
             total={selectedReward?.total ?? 0}
             businessName={selectedReward?.businessName}
+            businessId={selectedReward?.businessId}
             circleLabels={(() => {
               if (!selectedReward || (selectedReward.total ?? 0) <= 0) return undefined;
               const total = selectedReward.total ?? 0;
               const products = selectedReward.selectedProducts || [];
               const actions = selectedReward.selectedActions || [];
-              const collected = (selectedReward.collectedItems || []).map((c: { itemType: string; itemName: string }) => c.itemName);
-              const fromQr = [...products, ...actions];
-              return fromQr.length >= total
-                ? fromQr.slice(0, total)
-                : [...collected, ...fromQr.filter((n) => !collected.includes(n))].slice(0, total);
+              const fromQr = [...products, ...actions].slice(0, total);
+              return fromQr.length >= total ? fromQr : undefined;
+            })()}
+            stampedIndices={(() => {
+              if (!selectedReward) return undefined;
+              const products = selectedReward.selectedProducts || [];
+              const actions = selectedReward.selectedActions || [];
+              const collected = selectedReward.collectedItems || [];
+              const out: number[] = [];
+              for (const c of collected) {
+                if (c.itemType === 'product') {
+                  const i = products.indexOf(c.itemName);
+                  if (i >= 0) out.push(i);
+                } else {
+                  const i = actions.indexOf(c.itemName);
+                  if (i >= 0) out.push(products.length + i);
+                }
+              }
+              return out.length > 0 ? out : undefined;
             })()}
             onClose={() => setRewardQRModalVisible(false)}
             onNavigate={onNavigate}
+            onViewBusinessPage={onViewBusinessPage}
           />
           
           {/* Redeem Modal */}

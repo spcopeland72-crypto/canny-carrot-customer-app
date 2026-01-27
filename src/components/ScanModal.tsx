@@ -322,9 +322,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         return;
       }
 
-      // Load existing rewards to check if campaign already exists
+      // Load existing rewards; match by unique id or qrCode only
       const existingRewards = await loadRewards();
-      let existingCampaign = existingRewards.find(
+      const existingCampaign = existingRewards.find(
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
 
@@ -382,15 +382,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
-        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
+          [{text: 'OK', onPress: async () => {
+            await stopCameraAndScanner();
+            onClose();
+            onRewardScanned?.(existingCampaign!);
           }}]
         );
       } else {
@@ -428,7 +427,6 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         const updatedRewards = [...existingRewards, newCampaign];
         await saveRewards(updatedRewards);
 
-        // Verify the campaign was saved
         const verifyRewards = await loadRewards();
         const savedCampaign = verifyRewards.find(r => r.id === newCampaign.id);
         if (savedCampaign) {
@@ -437,15 +435,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
         }
 
-        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(newCampaign), 100);
+          [{text: 'OK', onPress: async () => {
+            await stopCameraAndScanner();
+            onClose();
+            onRewardScanned?.(newCampaign);
           }}]
         );
       }
@@ -487,9 +484,9 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
       }
 
-      // Load existing rewards to check if campaign already exists
+      // Load existing rewards; match by unique id or qrCode only
       const existingRewards = await loadRewards();
-      let existingCampaign = existingRewards.find(
+      const existingCampaign = existingRewards.find(
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
 
@@ -528,15 +525,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
 
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
-        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
+          [{text: 'OK', onPress: async () => {
+            await stopCameraAndScanner();
+            onClose();
+            onRewardScanned?.(existingCampaign!);
           }}]
         );
       } else {
@@ -579,15 +575,14 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
         }
 
-        // Stop camera/scanner, close modal, then show success (same as reward flow)
         isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(newCampaign), 100);
+          [{text: 'OK', onPress: async () => {
+            await stopCameraAndScanner();
+            onClose();
+            onRewardScanned?.(newCampaign);
           }}]
         );
       }

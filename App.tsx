@@ -41,6 +41,7 @@ import AccountPage from './src/components/AccountPage';
 import OrdersPage from './src/components/OrdersPage';
 import FindShopPage from './src/components/FindShopPage';
 import MenuPage from './src/components/MenuPage';
+import BusinessPage from './src/components/BusinessPage';
 import ContactCustomerCarePage from './src/components/ContactCustomerCarePage';
 import WelcomePage from './src/components/WelcomePage';
 import FAQsPage from './src/components/FAQsPage';
@@ -75,6 +76,7 @@ function App(): React.JSX.Element {
   const [rewards, setRewards] = useState<CustomerReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [viewingBusiness, setViewingBusiness] = useState<{ businessName: string; businessId?: string } | null>(null);
   
   // Log when component mounts
   useEffect(() => {
@@ -184,6 +186,12 @@ function App(): React.JSX.Element {
     setCurrentScreen(screen);
   };
 
+  const handleViewBusinessPage = (businessName: string, businessId?: string) => {
+    setViewingBusiness({ businessName, businessId });
+    setPreviousScreen(currentScreen);
+    setCurrentScreen('BusinessPage');
+  };
+
   const handleBack = () => {
     if (previousScreen) {
       setCurrentScreen(previousScreen);
@@ -205,6 +213,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onViewBusinessPage={handleViewBusinessPage}
             rewards={rewards}
           />
         );
@@ -293,6 +302,23 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+          />
+        );
+      case 'BusinessPage':
+        return viewingBusiness ? (
+          <BusinessPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
+            businessName={viewingBusiness.businessName}
+            businessId={viewingBusiness.businessId}
+          />
+        ) : (
+          <HomeScreen
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onScanPress={handleScanPress}
+            rewards={rewards}
           />
         );
       case 'ContactCustomerCare':
@@ -427,6 +453,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={() => handleNavigate('Home')}
+            onViewBusinessPage={handleViewBusinessPage}
           />
         );
       case 'SeeAllGoodies':

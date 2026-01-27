@@ -200,6 +200,7 @@ interface RewardCard {
   businessId?: string;
   /** Fallback labels (collected + "Remaining") when campaign fetch fails. */
   circleLabels?: string[];
+  stampedIndices?: number[];
 }
 
 interface GoodieCard {
@@ -219,6 +220,7 @@ interface HomeScreenProps {
   currentScreen?: string;
   onNavigate?: (screen: string) => void;
   onScanPress?: () => void;
+  onViewBusinessPage?: (businessName: string, businessId?: string) => void;
   rewards?: Array<{
     id: string;
     name: string;
@@ -243,6 +245,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   currentScreen = 'Home',
   onNavigate = () => {},
   onScanPress = () => {},
+  onViewBusinessPage,
   rewards: propsRewards = [],
 }) => {
   const [userName] = useState('Simon'); // This would come from user context
@@ -370,14 +373,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         const total = reward.total || 0;
         const products = reward.selectedProducts || [];
         const actions = reward.selectedActions || [];
-        const collected = (reward.collectedItems || []).map((c: { itemType: string; itemName: string }) => c.itemName);
-        const fromQr = [...products, ...actions];
-        const circleLabels =
-          total > 0
-            ? (fromQr.length >= total
-                ? fromQr.slice(0, total)
-                : [...collected, ...fromQr.filter((n) => !collected.includes(n))].slice(0, total))
-            : undefined;
+        const fromQr = [...products, ...actions].slice(0, total);
+        const circleLabels = total > 0 && fromQr.length >= total ? fromQr : undefined;
+        const collected = reward.collectedItems || [];
+        const stampedIndices: number[] = [];
+        for (const c of collected) {
+          if (c.itemType === 'product') {
+            const i = products.indexOf(c.itemName);
+            if (i >= 0) stampedIndices.push(i);
+          } else {
+            const i = actions.indexOf(c.itemName);
+            if (i >= 0) stampedIndices.push(products.length + i);
+          }
+        }
         let businessId = reward.businessId;
         if (!businessId && reward.id.startsWith('campaign-')) {
           const parts = reward.id.slice(9).split('-');
@@ -1121,9 +1129,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         count={selectedRewardForQR?.count || 0}
         total={selectedRewardForQR?.total || 0}
         businessName={selectedRewardForQR?.businessName}
+        businessId={selectedRewardForQR?.businessId}
         circleLabels={selectedRewardForQR?.circleLabels}
+        stampedIndices={selectedRewardForQR?.stampedIndices}
         onClose={() => setRewardQRModalVisible(false)}
         onNavigate={onNavigate}
+        onViewBusinessPage={onViewBusinessPage}
       />
       
       {/* Account Modal */}

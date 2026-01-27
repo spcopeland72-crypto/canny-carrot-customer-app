@@ -9,18 +9,14 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 
-const ROW_PATTERN = [3, 1, 2];
+const COLS = 3;
 
-function chunkIntoRows<T>(arr: T[]): T[][] {
-  const rows: T[][] = [];
-  let i = 0;
-  let p = 0;
-  while (i < arr.length) {
-    const n = ROW_PATTERN[p % ROW_PATTERN.length];
-    const take = Math.min(n, arr.length - i);
-    if (take > 0) rows.push(arr.slice(i, i + take));
-    i += take;
-    p += 1;
+function chunkIntoGrid<T>(arr: T[]): (T | null)[][] {
+  const rows: (T | null)[][] = [];
+  for (let i = 0; i < arr.length; i += COLS) {
+    const row: (T | null)[] = [...arr.slice(i, i + COLS)];
+    while (row.length < COLS) row.push(null as T | null);
+    rows.push(row);
   }
   return rows;
 }
@@ -44,10 +40,15 @@ interface RewardQRCodeModalProps {
   count: number; // Points earned
   total: number; // Points needed
   businessName?: string;
-  /** Product/action labels per circle (from QR data only). Length = total. */
+  businessId?: string;
+  /** Fixed headings per circle (products then actions). Length = total. */
   circleLabels?: string[];
+  /** Which circle indices have a stamp (by position in list). If set, use this; else fill first `count` circles. */
+  stampedIndices?: number[];
   onClose: () => void;
   onNavigate?: (screen: string) => void;
+  /** When set, "View Business Page" navigates to BusinessPage with this business instead of Menu. */
+  onViewBusinessPage?: (businessName: string, businessId?: string) => void;
 }
 
 const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
@@ -56,21 +57,29 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
   count,
   total,
   businessName,
+  businessId,
   circleLabels,
+  stampedIndices,
   onClose,
   onNavigate,
+  onViewBusinessPage,
 }) => {
+  const stampedSet = stampedIndices ? new Set(stampedIndices) : null;
   const circles = Array.from({length: total}, (_, index) => ({
     id: index,
-    hasStamp: index < count,
+    hasStamp: stampedSet ? stampedSet.has(index) : index < count,
     label: circleLabels?.[index] ?? undefined,
   }));
 
-  const rows = chunkIntoRows(circles);
+  const grid = chunkIntoGrid(circles);
 
   const handleBusinessPage = () => {
     onClose();
-    if (onNavigate) onNavigate('Menu');
+    if (onViewBusinessPage && (businessName || businessId)) {
+      onViewBusinessPage(businessName || 'Business', businessId);
+    } else if (onNavigate) {
+      onNavigate('Menu');
+    }
   };
 
   const handleMessages = () => {
@@ -88,33 +97,38 @@ const RewardQRCodeModal: React.FC<RewardQRCodeModalProps> = ({
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{rewardName}</Text>
           
-          {/* Rows of 3, 1, 2, 3, 1, 2…; rows of 1 or 2 centered */}
-          <View style={styles.circlesContainer}>
-            {rows.map((row, ri) => (
-              <View
-                key={ri}
-                style={[
-                  styles.circleRow,
-                  row.length < 3 && styles.circleRowCentered,
-                ]}>
-                {row.map((circle) => (
-                  <View key={circle.id} style={styles.circleWrapper}>
-                    {circle.label != null ? (
-                      <Text style={styles.circleLabel} numberOfLines={2}>
-                        {circle.label}
-                      </Text>
-                    ) : null}
-                    <View style={styles.circle}>
-                      {circle.hasStamp && ccLogoImage ? (
-                        <Image
-                          source={ccLogoImage}
-                          style={styles.stampImage}
-                          resizeMode="contain"
-                        />
-                      ) : null}
+          {/* 3×3 grid: top-left to bottom-right, row by row. Fixed cell size so circles align. */}
+          <View style={styles.gridContainer}>
+            {grid.map((row, ri) => (
+              <View key={ri} style={styles.gridRow}>
+                {row.map((cell, ci) => {
+                  if (!cell) {
+                    return (
+                      <View key={`empty-${ri}-${ci}`} style={styles.gridCell}>
+                        <View style={styles.labelSlot} />
+                        <View style={[styles.circle, styles.circlePlaceholder]} />
+                      </View>
+                    );
+                  }
+                  return (
+                    <View key={cell.id} style={styles.gridCell}>
+                      <View style={styles.labelSlot}>
+                        <Text style={styles.circleLabel} numberOfLines={2}>
+                          {cell.label ?? ''}
+                        </Text>
+                      </View>
+                      <View style={styles.circle}>
+                        {cell.hasStamp && ccLogoImage ? (
+                          <Image
+                            source={ccLogoImage}
+                            style={styles.stampImage}
+                            resizeMode="contain"
+                          />
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ))}
           </View>
@@ -160,43 +174,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: Colors.text.primary,
     marginBottom: 24,
     textAlign: 'center',
   },
-  circlesContainer: {
+  gridContainer: {
+    width: '100%',
     marginBottom: 32,
-    paddingHorizontal: 8,
-    alignItems: 'center',
+    paddingHorizontal: 4,
   },
-  circleRow: {
+  gridRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  circleRowCentered: {
-    justifyContent: 'center',
-  },
-  circleWrapper: {
-    margin: 4,
+  gridCell: {
+    flex: 1,
     alignItems: 'center',
-    minWidth: 56,
+    justifyContent: 'flex-start',
+    marginHorizontal: 4,
+  },
+  labelSlot: {
+    height: 52,
+    width: '100%',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   circleLabel: {
-    fontSize: 11,
+    fontSize: 22,
     fontWeight: '600',
     color: Colors.text.secondary,
-    marginBottom: 4,
     textAlign: 'center',
-    maxWidth: 70,
+    paddingHorizontal: 2,
   },
   circle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 2,
     borderColor: Colors.neutral[300],
     backgroundColor: Colors.neutral[50],
@@ -205,8 +222,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   stampImage: {
-    width: 46,
-    height: 46,
+    width: 92,
+    height: 92,
+  },
+  circlePlaceholder: {
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
   linksContainer: {
     width: '100%',
