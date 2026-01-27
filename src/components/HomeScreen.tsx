@@ -30,7 +30,6 @@ import RewardQRCodeModal from './RewardQRCodeModal';
 import AccountModal from './AccountModal';
 import {redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
-import {loadBusinesses} from '../utils/businessStorage';
 import {indexInList} from '../utils/campaignStampUtils';
 
 // Import images at module level
@@ -332,20 +331,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [congratulationsContext, setCongratulationsContext] = useState<'earned' | 'redeemed'>('earned');
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<RewardCard | null>(null);
-  const [businessNameByIds, setBusinessNameByIds] = useState<Record<string, string>>({});
   const greeting = getTimeBasedGreeting();
-
-  useEffect(() => {
-    loadBusinesses()
-      .then((list) => {
-        const map: Record<string, string> = {};
-        for (const b of list) {
-          if (b?.id && b?.name) map[b.id] = b.name;
-        }
-        setBusinessNameByIds(map);
-      })
-      .catch(() => {});
-  }, []);
 
   // Set online-black.png from module-level variable
   // Rotate Featured Gold Members images every 3 seconds
@@ -381,7 +367,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         return b.id.localeCompare(a.id); // Fallback: sort by id descending
       })
     : [];
-  
+
   const rewardCards: RewardCard[] = sortedRewards.length > 0
     ? sortedRewards.map(reward => {
         const total = reward.total || 0;
@@ -400,17 +386,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             if (i >= 0) stampedIndices.push(products.length + i);
           }
         }
-        let effectiveBusinessId = reward.businessId;
-        if (!effectiveBusinessId && reward.id.startsWith('campaign-')) {
+        let businessId = reward.businessId;
+        if (!businessId && reward.id.startsWith('campaign-')) {
           const parts = reward.id.slice(9).split('-');
-          if (parts.length >= 2) effectiveBusinessId = parts[0];
+          if (parts.length >= 2) businessId = parts[0];
         }
-        // Same resolution for campaigns and rewards: reward.businessName or lookup by businessId
-        const rawName = (reward.businessName ?? '').trim();
-        const effectiveBusinessName =
-          rawName || (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
-        // Always show something when we have businessId (reward icons same as campaign)
-        const displayBusinessName = effectiveBusinessName || (effectiveBusinessId ? 'Business' : undefined);
+        /* Business name/id: same for campaigns and rewards — identical data, same render */
+        const businessName = (reward.businessName ?? '').trim() || undefined;
         return {
           id: reward.id,
           title: reward.name,
@@ -421,8 +403,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           isEarned: reward.isEarned || false,
           pinCode: reward.pinCode,
           qrCode: reward.qrCode,
-          businessName: displayBusinessName,
-          businessId: effectiveBusinessId || reward.businessId,
+          businessName,
+          businessId: businessId || reward.businessId,
           circleLabels,
           stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
         };
@@ -784,6 +766,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       </TouchableOpacity>
                     )}
                   </View>
+                  {/* Business name: same for campaigns and rewards — one code path */}
                   {card.businessName ? (
                     <Text style={styles.rewardBusinessName} numberOfLines={1}>{card.businessName}</Text>
                   ) : null}
@@ -1417,7 +1400,7 @@ const styles = StyleSheet.create({
   },
   rewardBusinessName: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '700',
     color: Colors.text.secondary,
     textAlign: 'center',
     marginBottom: 2,
@@ -1429,7 +1412,7 @@ const styles = StyleSheet.create({
   },
   rewardTitle: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text.primary,
     textAlign: 'center',
     width: '100%',
