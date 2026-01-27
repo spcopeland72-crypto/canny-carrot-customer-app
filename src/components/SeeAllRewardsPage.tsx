@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
+import {loadBusinesses} from '../utils/businessStorage';
 import {indexInList} from '../utils/campaignStampUtils';
 import RewardQRCodeModal from './RewardQRCodeModal';
 import RedeemModal from './RedeemModal';
@@ -38,6 +39,19 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
   const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<CustomerReward | null>(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [rewardToDelete, setRewardToDelete] = useState<CustomerReward | null>(null);
+  const [businessNameByIds, setBusinessNameByIds] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadBusinesses()
+      .then((list) => {
+        const map: Record<string, string> = {};
+        for (const b of list) {
+          if (b?.id && b?.name) map[b.id] = b.name;
+        }
+        setBusinessNameByIds(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const loadRewardsData = useCallback(async () => {
     try {
@@ -118,12 +132,20 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
       onNavigate={onNavigate}
       onBack={onBack}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {displayRewards.map((reward) => (
+        {displayRewards.map((reward) => {
+          let effectiveBusinessId = reward.businessId;
+          if (!effectiveBusinessId && reward.id.startsWith('campaign-')) {
+            const parts = reward.id.slice(9).split('-');
+            if (parts.length >= 2) effectiveBusinessId = parts[0];
+          }
+          const effectiveBusinessName =
+            reward.businessName ?? (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
+          return (
           <TouchableOpacity
             key={reward.id}
             style={styles.rewardRow}
             onPress={() => handleRewardPress(reward)}>
-            {/* Reward Icon + business name below (like campaign) */}
+            {/* Reward Icon + business name below (same as campaign) */}
             <View style={styles.iconColumn}>
               <View style={styles.iconContainer}>
                 {reward.businessLogo ? (
@@ -145,9 +167,9 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
                   </TouchableOpacity>
                 )}
               </View>
-              {reward.businessName ? (
+              {effectiveBusinessName ? (
                 <Text style={styles.businessNameUnderIcon} numberOfLines={1}>
-                  {reward.businessName}
+                  {effectiveBusinessName}
                 </Text>
               ) : null}
             </View>
@@ -174,18 +196,35 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             {/* Arrow indicator */}
             <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
-        ))}
+          );
+        })}
           </ScrollView>
           
-          {/* Reward QR Code Modal */}
+          {/* Reward QR Code Modal — same effective business name/id as list */}
           <RewardQRCodeModal
             visible={rewardQRModalVisible}
             rewardName={selectedReward?.name || ''}
             qrValue={selectedReward?.qrCode || ''}
             count={selectedReward?.count ?? 0}
             total={selectedReward?.total ?? 0}
-            businessName={selectedReward?.businessName}
-            businessId={selectedReward?.businessId}
+            businessName={(() => {
+              if (!selectedReward) return undefined;
+              let bid = selectedReward.businessId;
+              if (!bid && selectedReward.id.startsWith('campaign-')) {
+                const parts = selectedReward.id.slice(9).split('-');
+                if (parts.length >= 2) bid = parts[0];
+              }
+              return selectedReward.businessName ?? (bid ? businessNameByIds[bid] : undefined);
+            })()}
+            businessId={(() => {
+              if (!selectedReward) return undefined;
+              let bid = selectedReward.businessId;
+              if (!bid && selectedReward.id.startsWith('campaign-')) {
+                const parts = selectedReward.id.slice(9).split('-');
+                if (parts.length >= 2) bid = parts[0];
+              }
+              return bid;
+            })()}
             circleLabels={(() => {
               if (!selectedReward || (selectedReward.total ?? 0) <= 0) return undefined;
               const total = selectedReward.total ?? 0;

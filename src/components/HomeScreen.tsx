@@ -30,6 +30,7 @@ import RewardQRCodeModal from './RewardQRCodeModal';
 import AccountModal from './AccountModal';
 import {redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
+import {loadBusinesses} from '../utils/businessStorage';
 import {indexInList} from '../utils/campaignStampUtils';
 
 // Import images at module level
@@ -265,7 +266,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     if (tickerWidth > 0 && !animationRef.current) {
       // Create continuous animation that never resets
       const startContinuousAnimation = () => {
-        // Cycle 3: 2→0 (reset to 0 after reaching 2)
+        // Cycle 3: 2?0 (reset to 0 after reaching 2)
         const currentValue = tickerAnimation._value || 0;
         let targetValue;
         
@@ -274,7 +275,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           tickerAnimation.setValue(0);
           targetValue = 1;
         } else {
-          // Continue incrementing: 0→1, 1→2
+          // Continue incrementing: 0?1, 1?2
           targetValue = currentValue + 1;
         }
         
@@ -287,7 +288,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         
         animationRef.current.start((finished) => {
           if (finished) {
-            // Continue: 0→1→2→0→1→2...
+            // Continue: 0?1?2?0?1?2...
             animationRef.current = null;
             startContinuousAnimation();
           }
@@ -331,7 +332,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [congratulationsContext, setCongratulationsContext] = useState<'earned' | 'redeemed'>('earned');
   const [rewardQRModalVisible, setRewardQRModalVisible] = useState(false);
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<RewardCard | null>(null);
+  const [businessNameByIds, setBusinessNameByIds] = useState<Record<string, string>>({});
   const greeting = getTimeBasedGreeting();
+
+  useEffect(() => {
+    loadBusinesses()
+      .then((list) => {
+        const map: Record<string, string> = {};
+        for (const b of list) {
+          if (b?.id && b?.name) map[b.id] = b.name;
+        }
+        setBusinessNameByIds(map);
+      })
+      .catch(() => {});
+  }, []);
 
   // Set online-black.png from module-level variable
   // Rotate Featured Gold Members images every 3 seconds
@@ -386,11 +400,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             if (i >= 0) stampedIndices.push(products.length + i);
           }
         }
-        let businessId = reward.businessId;
-        if (!businessId && reward.id.startsWith('campaign-')) {
+        let effectiveBusinessId = reward.businessId;
+        if (!effectiveBusinessId && reward.id.startsWith('campaign-')) {
           const parts = reward.id.slice(9).split('-');
-          if (parts.length >= 2) businessId = parts[0];
+          if (parts.length >= 2) effectiveBusinessId = parts[0];
         }
+        // Same resolution for campaigns and rewards: reward.businessName or lookup by businessId
+        const effectiveBusinessName =
+          reward.businessName ?? (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
         return {
           id: reward.id,
           title: reward.name,
@@ -401,8 +418,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           isEarned: reward.isEarned || false,
           pinCode: reward.pinCode,
           qrCode: reward.qrCode,
-          businessName: reward.businessName,
-          businessId: businessId || reward.businessId,
+          businessName: effectiveBusinessName,
+          businessId: effectiveBusinessId || reward.businessId,
           circleLabels,
           stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
         };
@@ -421,25 +438,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       id: '1',
       title: 'Rewards When You Shop Online',
       subtitle: 'Get started',
-      icon: '🛍️',
+      icon: '???',
     },
     {
       id: '2',
-      title: 'Ask Carrie\nCarrot 🥕',
+      title: 'Ask Carrie\nCarrot ??',
       subtitle: 'AI Support 24/7',
-      icon: '💬',
+      icon: '??',
     },
     {
       id: '3',
       title: 'Write a Review for More Rewards',
       subtitle: 'Nearest shop',
-      icon: '📍',
+      icon: '??',
     },
     {
       id: '4',
       title: 'Refer and Earn',
       subtitle: 'Treat someone',
-      icon: '🎁',
+      icon: '??',
     },
   ];
 
@@ -721,7 +738,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               const total = Math.max(1, card.total || 1);
               const earned = Math.min(card.count || 0, total);
               
-              // Handler: same as campaign — if earned, Redeem modal; else QR modal
+              // Handler: same as campaign � if earned, Redeem modal; else QR modal
               const handleRewardPress = () => {
                 if (isEarned) {
                   setSelectedRewardForRedemption(card);
@@ -737,7 +754,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   key={card.id}
                   style={styles.rewardCard}
                   onPress={handleRewardPress}>
-                  <Text style={styles.rewardTitle}>{card.title}</Text>
+                  <View style={styles.rewardTitleWrap}>
+                    <Text style={styles.rewardTitle} numberOfLines={1} ellipsizeMode="tail">
+                      {card.title}
+                    </Text>
+                  </View>
                   <View style={styles.rewardProgressContainer}>
                     <CampaignProgressCircle
                       earned={earned}
@@ -755,7 +776,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         }}
                         activeOpacity={0.8}>
                         <View style={styles.redeemBadge}>
-                          <Text style={styles.redeemBadgeText}>🎁</Text>
+                          <Text style={styles.redeemBadgeText}>??</Text>
                         </View>
                       </TouchableOpacity>
                     )}
@@ -1033,7 +1054,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   pointsEarned: 0,
                 };
                 await saveRewards(allRewards);
-                console.log(`✅ Reward ${selectedRewardForRedemption!.id} redeemed and reset to 0 points`);
+                console.log(`? Reward ${selectedRewardForRedemption!.id} redeemed and reset to 0 points`);
               }
               
               // Keep reward info for congratulations message, then show modal
@@ -1398,12 +1419,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
+  rewardTitleWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   rewardTitle: {
     fontSize: 12,
     fontWeight: '600',
     color: Colors.text.primary,
     textAlign: 'center',
-    marginBottom: 8,
+    width: '100%',
   },
   rewardProgressContainer: {
     position: 'relative',
