@@ -30,6 +30,7 @@ import RewardQRCodeModal from './RewardQRCodeModal';
 import AccountModal from './AccountModal';
 import {redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
+import {indexInList} from '../utils/campaignStampUtils';
 
 // Import images at module level
 // Path from src/components/ to assets/ is ../../assets/
@@ -378,10 +379,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         const stampedIndices: number[] = [];
         for (const c of collected) {
           if (c.itemType === 'product') {
-            const i = products.indexOf(c.itemName);
+            const i = indexInList(products, c.itemName);
             if (i >= 0) stampedIndices.push(i);
           } else {
-            const i = actions.indexOf(c.itemName);
+            const i = indexInList(actions, c.itemName);
             if (i >= 0) stampedIndices.push(products.length + i);
           }
         }

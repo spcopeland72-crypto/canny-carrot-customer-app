@@ -16,6 +16,7 @@ import {CameraView, useCameraPermissions, BarcodeScanningResult} from 'expo-came
 import {Colors} from '../constants/Colors';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
+import {canonicalName, namesMatch} from '../utils/campaignStampUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
 import {recordRewardScan, recordCampaignScan} from '../services/customerRecord';
 
@@ -325,9 +326,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
 
-      const key = `${itemType}:${itemName}`;
       const alreadyCollected = existingCampaign?.collectedItems?.some(
-        (c) => `${c.itemType}:${c.itemName}` === key
+        (c) => c.itemType === itemType && namesMatch(c.itemName, itemName)
       );
       if (alreadyCollected && itemName) {
         await handleValidationError('This has already been claimed against this reward.');
@@ -409,7 +409,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
           createdAt: new Date().toISOString(),
           lastScannedAt: new Date().toISOString(),
-          collectedItems: itemName ? [{ itemType, itemName }] : [],
+          collectedItems: (() => {
+            if (!itemName) return [];
+            const list = itemType === 'product' ? allProducts : allActions;
+            return [{ itemType, itemName: canonicalName(list, itemName) }];
+          })(),
         };
 
         console.log('[ScanModal] Creating new campaign from CAMPAIGN_ITEM:', {

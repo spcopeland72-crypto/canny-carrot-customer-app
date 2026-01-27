@@ -11,6 +11,7 @@ import {
 import {Colors} from '../constants/Colors';
 import PageTemplate from './PageTemplate';
 import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorage';
+import {indexInList} from '../utils/campaignStampUtils';
 import RewardQRCodeModal from './RewardQRCodeModal';
 import RedeemModal from './RedeemModal';
 import CongratulationsModal from './CongratulationsModal';
@@ -199,10 +200,10 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
               const out: number[] = [];
               for (const c of collected) {
                 if (c.itemType === 'product') {
-                  const i = products.indexOf(c.itemName);
+                  const i = indexInList(products, c.itemName);
                   if (i >= 0) out.push(i);
                 } else {
-                  const i = actions.indexOf(c.itemName);
+                  const i = indexInList(actions, c.itemName);
                   if (i >= 0) out.push(products.length + i);
                 }
               }
