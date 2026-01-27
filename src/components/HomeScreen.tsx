@@ -406,8 +406,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           if (parts.length >= 2) effectiveBusinessId = parts[0];
         }
         // Same resolution for campaigns and rewards: reward.businessName or lookup by businessId
+        const rawName = (reward.businessName ?? '').trim();
         const effectiveBusinessName =
-          reward.businessName ?? (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
+          rawName || (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
+        // Always show something when we have businessId (reward icons same as campaign)
+        const displayBusinessName = effectiveBusinessName || (effectiveBusinessId ? 'Business' : undefined);
         return {
           id: reward.id,
           title: reward.name,
@@ -418,7 +421,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           isEarned: reward.isEarned || false,
           pinCode: reward.pinCode,
           qrCode: reward.qrCode,
-          businessName: effectiveBusinessName,
+          businessName: displayBusinessName,
           businessId: effectiveBusinessId || reward.businessId,
           circleLabels,
           stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
@@ -776,7 +779,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                         }}
                         activeOpacity={0.8}>
                         <View style={styles.redeemBadge}>
-                          <Text style={styles.redeemBadgeText}>??</Text>
+                          <Text style={styles.redeemBadgeText}>🎁</Text>
                         </View>
                       </TouchableOpacity>
                     )}

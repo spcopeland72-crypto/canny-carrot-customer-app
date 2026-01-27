@@ -138,8 +138,10 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             const parts = reward.id.slice(9).split('-');
             if (parts.length >= 2) effectiveBusinessId = parts[0];
           }
+          const rawName = (reward.businessName ?? '').trim();
           const effectiveBusinessName =
-            reward.businessName ?? (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
+            rawName || (effectiveBusinessId ? businessNameByIds[effectiveBusinessId] : undefined);
+          const displayBusinessName = effectiveBusinessName || (effectiveBusinessId ? 'Business' : undefined);
           return (
           <TouchableOpacity
             key={reward.id}
@@ -167,9 +169,9 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
                   </TouchableOpacity>
                 )}
               </View>
-              {effectiveBusinessName ? (
+              {displayBusinessName ? (
                 <Text style={styles.businessNameUnderIcon} numberOfLines={1}>
-                  {effectiveBusinessName}
+                  {displayBusinessName}
                 </Text>
               ) : null}
             </View>
@@ -214,7 +216,9 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
                 const parts = selectedReward.id.slice(9).split('-');
                 if (parts.length >= 2) bid = parts[0];
               }
-              return selectedReward.businessName ?? (bid ? businessNameByIds[bid] : undefined);
+              const raw = (selectedReward.businessName ?? '').trim();
+              const name = raw || (bid ? businessNameByIds[bid] : undefined);
+              return name || (bid ? 'Business' : undefined);
             })()}
             businessId={(() => {
               if (!selectedReward) return undefined;
