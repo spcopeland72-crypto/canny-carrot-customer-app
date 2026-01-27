@@ -83,6 +83,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
   // Safe area top padding for iOS (status bar + notch)
   const safeAreaTop = Platform.OS === 'ios' ? 44 : 12;
   const [scanError, setScanError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -290,8 +291,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
   const processCampaignQRCode = async (qrValue: string, parsed: ReturnType<typeof parseQRCode>) => {
     if ((parsed.type !== 'campaign' && parsed.type !== 'campaign_item') || !parsed.data) {
       console.warn('[ScanModal] Invalid campaign QR code:', qrValue);
-      isProcessingRef.current = false;
-      Alert.alert('Invalid QR Code', 'This does not appear to be a valid campaign QR code.');
+      await handleValidationError('This does not appear to be a valid campaign QR code.');
       return;
     }
 
@@ -315,10 +315,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const pointsPerScan = 1;
       const pointsRequired = totalFromQr;
       if (pointsRequired === 0) {
-        isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
-        Alert.alert('Invalid QR', 'Campaign has no products or actions.');
+        await handleValidationError('Campaign has no products or actions.');
         return;
       }
 
@@ -333,10 +330,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         (c) => `${c.itemType}:${c.itemName}` === key
       );
       if (alreadyCollected && itemName) {
-        isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
-        Alert.alert('ERROR', "You have already won this point.");
+        await handleValidationError('This has already been claimed against this reward.');
         return;
       }
 
@@ -492,6 +486,12 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
 
+      // Re-scan: user already has this campaign (same QR). Reject.
+      if (existingCampaign) {
+        await handleValidationError('This has already been claimed against this reward.');
+        return;
+      }
+
       // Get campaign points from QR code or use defaults
       const pointsPerScan = campaignData.pointsPerScan || 1;
       const pointsRequired = campaignData.pointsRequired || 5; // Default: 5 points required
@@ -508,92 +508,61 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         qrValue
       );
 
-      // Create or update campaign as a CustomerReward for carousel display
+      // Create new campaign entry (re-scan already rejected above)
       const campaignIcon = '🎯'; // Campaign icon
       const campaignType = 'action';
+      const newCampaign: CustomerReward = {
+        id: `campaign-${campaignId}`,
+        name: campaignName,
+        count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
+        total: Math.ceil(pointsRequired / pointsPerScan),
+        icon: campaignIcon,
+        type: campaignType,
+        requirement: Math.ceil(pointsRequired / pointsPerScan),
+        pointsPerPurchase: pointsPerScan,
+        rewardType: 'other',
+        qrCode: qrValue,
+        pointsEarned: campaignProgress.pointsEarned,
+        businessId: businessId !== 'default' ? businessId : undefined,
+        businessName: businessName,
+        isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
+        createdAt: new Date().toISOString(),
+        lastScannedAt: new Date().toISOString(),
+      };
 
-      if (existingCampaign) {
-        // Update existing campaign
-        existingCampaign.pointsEarned = campaignProgress.pointsEarned;
-        existingCampaign.count = Math.floor(campaignProgress.pointsEarned / pointsPerScan);
-        existingCampaign.total = Math.ceil(pointsRequired / pointsPerScan);
-        existingCampaign.isEarned = campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed';
-        existingCampaign.lastScannedAt = new Date().toISOString();
+      console.log('[ScanModal] Creating new campaign:', {
+        id: newCampaign.id,
+        name: newCampaign.name,
+        pointsEarned: newCampaign.pointsEarned,
+        total: newCampaign.total,
+      });
 
-        const updatedRewards = existingRewards.map(r =>
-          r.id === existingCampaign!.id ? existingCampaign! : r
-        );
-        await saveRewards(updatedRewards);
+      const updatedRewards = [...existingRewards, newCampaign];
+      await saveRewards(updatedRewards);
 
-        console.log('[ScanModal] Campaign updated:', existingCampaign.name);
-
-        isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
-        setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
-        setTimeout(() => {
-          Alert.alert(
-            'Campaign Updated!',
-            `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-            [{text: 'OK'}]
-          );
-        }, 100);
+      // Verify the campaign was saved
+      const verifyRewards = await loadRewards();
+      const savedCampaign = verifyRewards.find(r => r.id === newCampaign.id);
+      if (savedCampaign) {
+        console.log('[ScanModal] ✅ New campaign confirmed in storage:', savedCampaign.name);
       } else {
-        // Create new campaign entry
-        const newCampaign: CustomerReward = {
-          id: `campaign-${campaignId}`,
-          name: campaignName,
-          count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
-          total: Math.ceil(pointsRequired / pointsPerScan),
-          icon: campaignIcon,
-          type: campaignType,
-          requirement: Math.ceil(pointsRequired / pointsPerScan),
-          pointsPerPurchase: pointsPerScan,
-          rewardType: 'other',
-          qrCode: qrValue,
-          pointsEarned: campaignProgress.pointsEarned,
-          businessId: businessId !== 'default' ? businessId : undefined,
-          businessName: businessName,
-          isEarned: campaignProgress.status === 'earned' || campaignProgress.status === 'redeemed',
-          createdAt: new Date().toISOString(),
-          lastScannedAt: new Date().toISOString(),
-        };
-
-        console.log('[ScanModal] Creating new campaign:', {
-          id: newCampaign.id,
-          name: newCampaign.name,
-          pointsEarned: newCampaign.pointsEarned,
-          total: newCampaign.total,
-        });
-
-        const updatedRewards = [...existingRewards, newCampaign];
-        await saveRewards(updatedRewards);
-
-        // Verify the campaign was saved
-        const verifyRewards = await loadRewards();
-        const savedCampaign = verifyRewards.find(r => r.id === newCampaign.id);
-        if (savedCampaign) {
-          console.log('[ScanModal] ✅ New campaign confirmed in storage:', savedCampaign.name);
-        } else {
-          console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
-        }
-
-        isProcessingRef.current = false;
-        await stopCameraAndScanner();
-        onClose();
-        setTimeout(() => onRewardScanned?.(newCampaign), 100);
-        setTimeout(() => {
-          Alert.alert(
-            'Campaign Added!',
-            `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-            [{text: 'OK'}]
-          );
-        }, 100);
+        console.warn('[ScanModal] ⚠️ New campaign NOT found in storage after save!');
       }
+
+      isProcessingRef.current = false;
+      await stopCameraAndScanner();
+      onClose();
+      setTimeout(() => onRewardScanned?.(newCampaign), 100);
+      setTimeout(() => {
+        Alert.alert(
+          'Campaign Added!',
+          `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
+          [{text: 'OK'}]
+        );
+      }, 100);
     } catch (error) {
       console.error('[ScanModal] Error processing campaign QR code:', error);
-      isProcessingRef.current = false;
-      Alert.alert('Error', 'Failed to process campaign QR code. Please try again.');
+      await handleValidationError('Failed to process campaign QR code. Please try again.');
     }
   };
 
@@ -627,10 +596,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     // Validate QR code format
     if (!isValidQRCode(normalizedQr)) {
       console.warn('[ScanModal] Invalid QR code format:', normalizedQr);
-      isProcessingRef.current = false;
-      lastScannedCodeRef.current = null;
-      Alert.alert(
-        'Invalid QR Code', 
+      await handleValidationError(
         `This does not appear to be a valid QR code.\n\nScanned: ${normalizedQr.substring(0, 50)}${normalizedQr.length > 50 ? '...' : ''}`
       );
       return;
@@ -650,9 +616,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       
       if (!parsedReward || parsed.type === 'unknown') {
         console.warn('[ScanModal] Failed to parse QR code:', normalizedQr);
-        isProcessingRef.current = false;
-        Alert.alert(
-          'Invalid QR Code', 
+        await handleValidationError(
           `This does not appear to be a valid reward QR code.\n\nScanned: ${normalizedQr.substring(0, 50)}${normalizedQr.length > 50 ? '...' : ''}`
         );
         return;
@@ -847,10 +811,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       }
     } catch (error) {
       console.error('Error processing reward QR code:', error);
-      isProcessingRef.current = false;
-      Alert.alert('Error', 'Failed to process reward QR code. Please try again.');
+      await handleValidationError('Failed to process reward QR code. Please try again.');
     }
   };
+
+  useEffect(() => {
+    setValidationError(null);
+  }, [visible]);
 
   // Start camera scanner automatically when modal opens
   useEffect(() => {
@@ -1234,6 +1201,22 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     };
   }, [visible]);
 
+  const showValidationError = (message: string) => {
+    setValidationError(message);
+  };
+
+  const dismissValidationError = () => {
+    setValidationError(null);
+    onClose();
+  };
+
+  const handleValidationError = async (message: string) => {
+    isProcessingRef.current = false;
+    lastScannedCodeRef.current = null;
+    await stopCameraAndScanner();
+    showValidationError(message);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -1245,6 +1228,16 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           <TouchableOpacity style={[styles.closeButton, {top: safeAreaTop}]} onPress={onClose}>
             <Text style={styles.closeButtonText}>×</Text>
           </TouchableOpacity>
+
+          {validationError ? (
+            <View style={styles.validationErrorOverlay}>
+              <Text style={styles.validationErrorTitle}>Error</Text>
+              <Text style={styles.validationErrorText}>{validationError}</Text>
+              <TouchableOpacity style={styles.validationErrorCloseButton} onPress={dismissValidationError}>
+                <Text style={styles.validationErrorCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <View style={styles.content}>
             {calvinImage && (
@@ -1342,7 +1335,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
                             } catch (error) {
                               console.error('[ScanModal] Barcode scan processing error:', error);
                               console.error('[ScanModal] Error stack:', error instanceof Error ? error.stack : 'No stack');
-                              isProcessingRef.current = false;
+                              handleValidationError('An error occurred while processing the scan.').catch(() => {});
                             }
                           }}
                           barcodeScannerSettings={{
@@ -1515,6 +1508,41 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  validationErrorOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 20,
+  },
+  validationErrorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#DC3545',
+    marginBottom: 12,
+  },
+  validationErrorText: {
+    fontSize: 16,
+    color: Colors.background,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  validationErrorCloseButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  validationErrorCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.background,
   },
   errorOverlay: {
     position: 'absolute',

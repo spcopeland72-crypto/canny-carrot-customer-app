@@ -403,6 +403,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           businessName: reward.businessName,
           businessId: businessId || reward.businessId,
           circleLabels,
+          stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
         };
       })
     : [];
