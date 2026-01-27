@@ -383,13 +383,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: async () => {
-            await stopCameraAndScanner();
-            onClose();
-            onRewardScanned?.(existingCampaign!);
+          [{text: 'OK', onPress: () => {
+            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
           }}]
         );
       } else {
@@ -436,13 +436,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
 
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: async () => {
-            await stopCameraAndScanner();
-            onClose();
-            onRewardScanned?.(newCampaign);
+          [{text: 'OK', onPress: () => {
+            setTimeout(() => onRewardScanned?.(newCampaign), 100);
           }}]
         );
       }
@@ -526,13 +526,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         console.log('[ScanModal] Campaign updated:', existingCampaign.name);
 
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
         Alert.alert(
           'Campaign Updated!',
           `You earned ${pointsPerScan} point(s) for "${campaignName}"!\n\nProgress: ${existingCampaign.count} of ${existingCampaign.total}`,
-          [{text: 'OK', onPress: async () => {
-            await stopCameraAndScanner();
-            onClose();
-            onRewardScanned?.(existingCampaign!);
+          [{text: 'OK', onPress: () => {
+            setTimeout(() => onRewardScanned?.(existingCampaign!), 100);
           }}]
         );
       } else {
@@ -576,13 +576,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }
 
         isProcessingRef.current = false;
+        await stopCameraAndScanner();
+        onClose();
         Alert.alert(
           'Campaign Added!',
           `You've joined "${campaignName}"!\n\nYou earned ${pointsPerScan} point(s).\n\nProgress: ${newCampaign.count} of ${newCampaign.total}`,
-          [{text: 'OK', onPress: async () => {
-            await stopCameraAndScanner();
-            onClose();
-            onRewardScanned?.(newCampaign);
+          [{text: 'OK', onPress: () => {
+            setTimeout(() => onRewardScanned?.(newCampaign), 100);
           }}]
         );
       }
