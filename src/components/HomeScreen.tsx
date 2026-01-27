@@ -391,7 +391,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           const parts = reward.id.slice(9).split('-');
           if (parts.length >= 2) businessId = parts[0];
         }
-        /* Business name/id: same for campaigns and rewards — identical data, same render */
         const businessName = (reward.businessName ?? '').trim() || undefined;
         return {
           id: reward.id,
