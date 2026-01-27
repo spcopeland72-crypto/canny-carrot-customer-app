@@ -746,20 +746,19 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           console.log('[ScanModal] ✅ Updated reward confirmed in storage:', savedReward.name);
         }
         
-        // Stop camera/scanner, close modal, then show success (same as campaign flow)
+        // Stop camera/scanner, close modal, refresh carousel, then success alert (same as campaign flow)
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
-        if (isNewlyEarned) {
-          setTimeout(() => onRewardEarned?.(existingReward!), 100);
-        }
-        Alert.alert(
-          'Success, you earned a point!',
-          `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
-          [{text: 'OK', onPress: () => {
-            setTimeout(() => onRewardScanned?.(existingReward!), 100);
-          }}]
-        );
+        setTimeout(() => onRewardScanned?.(existingReward!), 100);
+        if (isNewlyEarned) setTimeout(() => onRewardEarned?.(existingReward!), 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Success, you earned a point!',
+            `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`,
+            [{text: 'OK'}]
+          );
+        }, 100);
       } else {
         const icons = ['🎁', '⭐', '📱', '👥', '💎', '🎂', '🎉', '🏆', '🎯', '🎊'];
         const type = parsedReward.products.length > 0 ? 'product' : 'action';
@@ -817,8 +816,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           isProcessingRef.current = false;
           await stopCameraAndScanner();
           onClose();
+          setTimeout(() => onRewardScanned?.(found), 100);
           if (isNewlyEarned) setTimeout(() => onRewardEarned?.(found), 100);
-          Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK', onPress: () => { setTimeout(() => onRewardScanned?.(found), 100); }}]);
+          setTimeout(() => {
+            Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK'}]);
+          }, 100);
           return;
         }
         
@@ -837,8 +839,11 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         isProcessingRef.current = false;
         await stopCameraAndScanner();
         onClose();
+        setTimeout(() => onRewardScanned?.(newReward), 100);
         if (isNewlyEarned) setTimeout(() => onRewardEarned?.(newReward), 100);
-        Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK', onPress: () => { setTimeout(() => onRewardScanned?.(newReward), 100); }}]);
+        setTimeout(() => {
+          Alert.alert('Success, you earned a point!', `You earned ${pointsToAdd} point(s) for "${parsedReward.name}"!`, [{text: 'OK'}]);
+        }, 100);
       }
     } catch (error) {
       console.error('Error processing reward QR code:', error);
