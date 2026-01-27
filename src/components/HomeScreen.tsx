@@ -743,7 +743,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       earned={earned}
                       total={total}
                       size={80}
-                      circleColor={card.id.startsWith('campaign-') ? '#4AE261' : undefined}
+                      circleColor={card.id.startsWith('campaign-') ? '#74A71C' : undefined}
                     />
                     {isEarned && (
                       <TouchableOpacity
@@ -760,8 +760,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       </TouchableOpacity>
                     )}
                   </View>
-                  {card.businessName && card.businessName !== card.title ? (
-                    <Text style={styles.rewardBusinessName}>{card.businessName}</Text>
+                  {card.businessName ? (
+                    <Text style={styles.rewardBusinessName} numberOfLines={1}>{card.businessName}</Text>
                   ) : null}
                 </TouchableOpacity>
               );

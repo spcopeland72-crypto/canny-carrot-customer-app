@@ -41,7 +41,7 @@ export interface CampaignProgressCircleProps {
   earned: number;
   total: number;
   size?: number;
-  /** Centre circle colour. Campaign: #4AE261 (canny carrot green); reward: grey (default). */
+  /** Centre circle colour. Campaign: #74A71C (business banner green); reward: grey (default). */
   circleColor?: string;
 }
 

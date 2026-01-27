@@ -123,26 +123,33 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             key={reward.id}
             style={styles.rewardRow}
             onPress={() => handleRewardPress(reward)}>
-            {/* Reward Icon */}
-            <View style={styles.iconContainer}>
-              {reward.businessLogo ? (
-                <Image
-                  source={{ uri: reward.businessLogo }}
-                  style={styles.rewardIcon}
-                  resizeMode="contain"
-                />
-              ) : (
-                <Text style={styles.rewardIconEmoji}>{reward.icon || '🎁'}</Text>
-              )}
-              {/* Red dot indicator if earned - clickable */}
-              {reward.isEarned && (
-                <TouchableOpacity
-                  style={styles.redeemDotContainer}
-                  onPress={(e) => handleRedeemDotPress(reward, e)}
-                  activeOpacity={0.8}>
-                  <View style={styles.redeemDot} />
-                </TouchableOpacity>
-              )}
+            {/* Reward Icon + business name below (like campaign) */}
+            <View style={styles.iconColumn}>
+              <View style={styles.iconContainer}>
+                {reward.businessLogo ? (
+                  <Image
+                    source={{ uri: reward.businessLogo }}
+                    style={styles.rewardIcon}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.rewardIconEmoji}>{reward.icon || '🎁'}</Text>
+                )}
+                {/* Red dot indicator if earned - clickable */}
+                {reward.isEarned && (
+                  <TouchableOpacity
+                    style={styles.redeemDotContainer}
+                    onPress={(e) => handleRedeemDotPress(reward, e)}
+                    activeOpacity={0.8}>
+                    <View style={styles.redeemDot} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {reward.businessName ? (
+                <Text style={styles.businessNameUnderIcon} numberOfLines={1}>
+                  {reward.businessName}
+                </Text>
+              ) : null}
             </View>
 
             {/* Reward Info */}
@@ -151,11 +158,6 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
               <Text style={styles.rewardProgress}>
                 {reward.count} of {reward.total}
               </Text>
-              {reward.businessName && (
-                <Text style={styles.businessName} numberOfLines={1}>
-                  {reward.businessName}
-                </Text>
-              )}
             </View>
 
             {/* Delete bin icon — only when we have saved rewards */}
@@ -324,6 +326,11 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.neutral[200],
     backgroundColor: Colors.background,
   },
+  iconColumn: {
+    alignItems: 'center',
+    marginRight: 16,
+    minWidth: 60,
+  },
   iconContainer: {
     width: 60,
     height: 60,
@@ -331,8 +338,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.neutral[50],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
     position: 'relative',
+  },
+  businessNameUnderIcon: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+    marginTop: 4,
+    maxWidth: 80,
+    textAlign: 'center',
   },
   rewardIcon: {
     width: 50,
@@ -373,12 +387,6 @@ const styles = StyleSheet.create({
   rewardProgress: {
     fontSize: 14,
     color: Colors.text.secondary,
-    marginBottom: 2,
-  },
-  businessName: {
-    fontSize: 12,
-    color: Colors.text.light,
-    marginTop: 2,
   },
   arrow: {
     fontSize: 24,
