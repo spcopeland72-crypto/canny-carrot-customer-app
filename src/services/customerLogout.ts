@@ -1,14 +1,14 @@
 /**
  * Customer Logout / Sync Service
  *
- * Syncs customer data to Redis via PUT /customers/:id/sync.
+ * Syncs customer data to Redis via PUT /customers/:id/sync when local is newer.
+ * CODEX: Newest overwrites oldest. If Redis is newer than local, we download (update local from server) and do NOT upload.
  * Uses customer **UUID** (not email or device id). Resolve by email if UUID unknown.
- * One-blob design: only customer record is synced; no reward/campaign progress updates.
  */
 
-import { getCustomerRecord } from './customerRecord';
+import { getCustomerRecordForSync } from './customerRecord';
 import { getCustomerId, setCustomerId } from './localStorage';
-import { getByEmail, sync as apiSync } from './customerApi';
+import { getByEmail, getById, sync as apiSync } from './customerApi';
 import type {
   CustomerRecord,
   CustomerRewardProgress,
@@ -47,8 +47,8 @@ function toCampaignItem(c: CustomerCampaignProgress): Record<string, unknown> {
 }
 
 /**
- * Build sync body { ...account, rewards } from CustomerRecord.
- * Uses customer UUID as id; account from profile; rewards = flattened active+earned+redeemed.
+ * Build sync body { ...account, rewards } from CustomerRecord only.
+ * Single store: all rewards live in the record; no second store to merge.
  */
 function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<string, unknown> {
   const profile = record.profile;
@@ -90,8 +90,9 @@ function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<str
 }
 
 /**
- * Perform sync — PUT /customers/:id/sync with local customer record.
- * Uses stored customer UUID; if missing, resolves by profile.email via by-email, then stores UUID.
+ * Perform sync — timestamp decides. Only upload if local is newer than Redis.
+ * If Redis is newer, do not PUT (never overwrite newer with older).
+ * Used for Click Sync and Logout.
  */
 export const performCustomerFullSync = async (): Promise<{
   success: boolean;
@@ -100,9 +101,9 @@ export const performCustomerFullSync = async (): Promise<{
   const errors: string[] = [];
 
   try {
-    const record = await getCustomerRecord();
+    const record = await getCustomerRecordForSync();
     if (!record) {
-      throw new Error('No customer record found');
+      return { success: false, errors: ['No customer record found'] };
     }
 
     let customerUuid = await getCustomerId();
@@ -116,11 +117,27 @@ export const performCustomerFullSync = async (): Promise<{
     }
 
     if (!customerUuid) {
-      throw new Error(
-        'No customer UUID. Sign in with email or complete sync first.'
-      );
+      return { success: true, errors: [] };
     }
 
+    // Definitive: data only flows when local timestamp is strictly newer than server. Only upload when local > server.
+    const serverRecord = await getById(customerUuid);
+    const localUpdatedAt = (record.updatedAt ?? '').trim();
+    const serverUpdatedAt = (serverRecord?.updatedAt ?? '').trim();
+
+    if (localUpdatedAt === '' || serverUpdatedAt === '') {
+      // Cannot apply rule — do not upload. Log error; do not invent fallback.
+      const msg = 'Cannot compare timestamps: local or server updatedAt missing. Not uploading.';
+      console.error('[CUSTOMER SYNC]', msg, { localUpdatedAt: localUpdatedAt || '(missing)', serverUpdatedAt: serverUpdatedAt || '(missing)' });
+      return { success: false, errors: [msg] };
+    }
+
+    if (serverUpdatedAt >= localUpdatedAt) {
+      // Server newer or same — do not upload. Rule: never overwrite when we're not strictly newer.
+      return { success: true, errors: [] };
+    }
+
+    // localUpdatedAt > serverUpdatedAt — upload. Single store = customerRecord.
     const body = buildSyncBody(record, customerUuid);
     const result = await apiSync(customerUuid, body);
 

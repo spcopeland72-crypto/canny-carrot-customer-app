@@ -34,8 +34,7 @@ import {loadRewards, saveRewards, type CustomerReward} from './src/utils/dataSto
 import {getStoredAuth} from './src/services/authService';
 import {getById} from './src/services/customerApi';
 import {setCustomerId} from './src/services/localStorage';
-import {updateCustomerProfile} from './src/services/customerRecord';
-import {mapApiRewardsToLocal} from './src/utils/customerRewardMapping';
+import {updateCustomerProfile, hydrateCustomerRecordFromApi, getCustomerRecord, saveCustomerRecord} from './src/services/customerRecord';
 import SearchPage from './src/components/SearchPage';
 import GeoSearchPage from './src/components/GeoSearch/GeoSearchPage';
 import ScanPage from './src/components/ScanPage';
@@ -196,25 +195,29 @@ function App(): React.JSX.Element {
       const auth = await getStoredAuth();
       if (!auth?.customerId) return;
       await setCustomerId(auth.customerId);
-      const record = await getById(auth.customerId);
-      if (record) {
-        const name = [record.firstName, record.lastName].filter(Boolean).join(' ').trim();
+      const apiRecord = await getById(auth.customerId);
+      if (apiRecord) {
+        const name = [apiRecord.firstName, apiRecord.lastName].filter(Boolean).join(' ').trim();
         await updateCustomerProfile({
-          id: record.id,
+          id: apiRecord.id,
           name: name || undefined,
-          email: record.email ?? auth.email,
-          phone: record.phone,
+          email: apiRecord.email ?? auth.email,
+          phone: apiRecord.phone,
         });
-        const rewardsList = Array.isArray(record.rewards) ? record.rewards : [];
-        const mapped = mapApiRewardsToLocal(rewardsList);
-        await saveRewards(mapped);
+        // Hydrate customerRecord reward/campaign arrays from API so logout sync does not overwrite Redis with empty data.
+        // Save with preserveUpdatedAt so we keep server timestamp — no edit means second logout won't overwrite Redis.
+        const record = await getCustomerRecord();
+        hydrateCustomerRecordFromApi(record, apiRecord);
+        await saveCustomerRecord(record, { preserveUpdatedAt: true });
 
+        const rewardsList = Array.isArray(apiRecord.rewards) ? apiRecord.rewards : [];
         const businessIds = [...new Set(
           rewardsList
             .map((r: { businessId?: string }) => r.businessId)
             .filter((id): id is string => !!id && id !== 'default')
         )];
         if (businessIds.length > 0) {
+          const { pullBusinessDetailsForCustomer } = await import('./src/services/businessDetailsStorage');
           const { pulled, errors } = await pullBusinessDetailsForCustomer(businessIds);
           if (errors.length > 0) console.warn('[App] Business details pull warnings:', errors);
         }
@@ -228,16 +231,9 @@ function App(): React.JSX.Element {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const { logoutCustomer } = await import('./src/services/authService');
-      await logoutCustomer();
-    } catch (e) {
-      console.error('[App] Logout error:', e);
-    } finally {
-      setIsAuthenticatedState(false);
-      setCurrentScreen('Home');
-    }
+  const handleLogout = () => {
+    setIsAuthenticatedState(false);
+    setCurrentScreen('Home');
   };
 
   const renderScreen = () => {

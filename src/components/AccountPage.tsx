@@ -13,11 +13,10 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
-import {getCustomerRecord, updateCustomerProfile} from '../services/customerRecord';
+import {getCustomerRecord, updateCustomerProfile, hydrateCustomerRecordFromApi, saveCustomerRecord} from '../services/customerRecord';
 import {getCustomerId, setCustomerId} from '../services/localStorage';
 import {getByEmail} from '../services/customerApi';
-import {saveRewards} from '../utils/dataStorage';
-import {mapApiRewardsToLocal} from '../utils/customerRewardMapping';
+import {pullBusinessDetailsForCustomer} from '../services/businessDetailsStorage';
 
 interface AccountPageProps {
   currentScreen: string;
@@ -121,11 +120,14 @@ const AccountPage: React.FC<AccountPageProps> = ({
         email: record.email ?? email,
         phone: record.phone,
       });
+      // Hydrate customerRecord reward/campaign arrays so logout sync does not overwrite Redis with empty data.
+      // Save with preserveUpdatedAt so we keep server timestamp — no edit means logout won't overwrite Redis.
+      const localRecord = await getCustomerRecord();
+      hydrateCustomerRecordFromApi(localRecord, record);
+      await saveCustomerRecord(localRecord, { preserveUpdatedAt: true });
       const rewards = Array.isArray(record.rewards) ? record.rewards : [];
-      const mapped = mapApiRewardsToLocal(rewards);
-      await saveRewards(mapped);
       const businessIds = [...new Set(
-        rewards.map((r: { businessId?: string }) => r.businessId).filter((id): id is string => !!id && id !== 'default')
+        (rewards as { businessId?: string }[]).map((r) => r.businessId).filter((id): id is string => !!id && id !== 'default')
       )];
       if (businessIds.length > 0) await pullBusinessDetailsForCustomer(businessIds);
       setHasCustomerId(true);

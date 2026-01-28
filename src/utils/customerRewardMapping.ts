@@ -1,4 +1,121 @@
-import type { CustomerReward } from './dataStorage';
+import type { CustomerReward } from '../types/customerReward';
+import type { CustomerRecord, CustomerRewardProgress, CustomerCampaignProgress } from '../types/customer';
+
+/**
+ * Flatten customer record reward/campaign arrays to UI shape. Single store = customerRecord; this is the read view.
+ */
+export function recordToFlatRewards(record: CustomerRecord): CustomerReward[] {
+  const now = new Date().toISOString();
+  const out: CustomerReward[] = [];
+  for (const r of [...record.activeRewards, ...record.earnedRewards, ...record.redeemedRewards]) {
+    out.push({
+      id: r.rewardId,
+      name: r.rewardName,
+      count: r.pointsEarned,
+      total: r.pointsRequired,
+      icon: '🎁',
+      requirement: r.pointsRequired,
+      pointsEarned: r.pointsEarned,
+      rewardType: r.rewardType ?? 'other',
+      businessId: r.businessId,
+      businessName: r.businessName,
+      qrCode: r.qrCode,
+      isEarned: r.status === 'earned' || r.status === 'redeemed',
+    });
+  }
+  for (const c of [...record.activeCampaigns, ...record.earnedCampaigns, ...record.redeemedCampaigns]) {
+    out.push({
+      id: `campaign-${c.campaignId}`,
+      name: c.campaignName,
+      count: c.pointsEarned,
+      total: c.pointsRequired,
+      icon: '🥐',
+      requirement: c.pointsRequired,
+      pointsEarned: c.pointsEarned,
+      businessId: c.businessId,
+      businessName: c.businessName,
+      qrCode: c.qrCode,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      isEarned: c.status === 'earned' || c.status === 'redeemed',
+    });
+  }
+  return out;
+}
+
+/**
+ * Replace record's reward/campaign arrays from flat UI list. Single store write path.
+ */
+export function flatRewardsToRecord(record: CustomerRecord, flat: CustomerReward[]): CustomerRecord {
+  const now = new Date().toISOString();
+  const activeRewards: CustomerRewardProgress[] = [];
+  const earnedRewards: CustomerRewardProgress[] = [];
+  const redeemedRewards: CustomerRewardProgress[] = [];
+  const activeCampaigns: CustomerCampaignProgress[] = [];
+  const earnedCampaigns: CustomerCampaignProgress[] = [];
+  const redeemedCampaigns: CustomerCampaignProgress[] = [];
+
+  for (const r of flat) {
+    const pointsEarned = r.pointsEarned ?? r.count;
+    const pointsRequired = r.requirement ?? r.total;
+    const earned = pointsEarned >= pointsRequired;
+    const businessId = r.businessId ?? 'default';
+
+    if (r.id.startsWith('campaign-')) {
+      const campaignId = r.id.replace(/^campaign-/, '');
+      const c: CustomerCampaignProgress = {
+        campaignId,
+        businessId,
+        businessName: r.businessName,
+        campaignName: r.name,
+        pointsEarned,
+        pointsRequired,
+        status: earned ? 'earned' : 'active',
+        firstScanAt: now,
+        lastScanAt: now,
+        scanHistory: [],
+        startDate: r.startDate,
+        endDate: r.endDate,
+        qrCode: r.qrCode,
+      };
+      if (earned) earnedCampaigns.push(c);
+      else activeCampaigns.push(c);
+    } else {
+      const prog: CustomerRewardProgress = {
+        rewardId: r.id,
+        businessId,
+        businessName: r.businessName,
+        rewardName: r.name,
+        pointsEarned,
+        pointsRequired,
+        status: earned ? 'earned' : 'active',
+        firstScanAt: now,
+        lastScanAt: now,
+        scanHistory: [],
+        rewardType: (r.rewardType as 'free_product' | 'discount' | 'other') ?? 'other',
+        qrCode: r.qrCode,
+      };
+      if (earned) earnedRewards.push(prog);
+      else activeRewards.push(prog);
+    }
+  }
+
+  const businessesVisited = [...new Set(flat.map((r) => r.businessId).filter(Boolean))] as string[];
+  return {
+    ...record,
+    updatedAt: now,
+    activeRewards,
+    earnedRewards,
+    redeemedRewards,
+    activeCampaigns,
+    earnedCampaigns,
+    redeemedCampaigns,
+    stats: {
+      ...record.stats,
+      businessesVisited: [...new Set([...record.stats.businessesVisited, ...businessesVisited])],
+    },
+  };
+}
 
 /**
  * Map API record.rewards (unknown[]) to CustomerReward[] for local storage.
