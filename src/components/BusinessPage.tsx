@@ -124,6 +124,8 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
   const [selectedRewardForQR, setSelectedRewardForQR] = useState<RewardCard | null>(null);
   const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<RewardCard | null>(null);
   const [justRedeemedName, setJustRedeemedName] = useState<string | null>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const carouselTotal = 1; // Placeholder: one slide until we have business photos
 
   const greeting = getTimeBasedGreeting();
 
@@ -310,45 +312,188 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
           <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
         </View>
 
-        {/* Business details */}
+        {/* Business details – all template slots; placeholders when data missing */}
         <View style={styles.businessSection}>
           <View style={styles.businessHeader}>
             {d?.logo ? (
               <Image source={{ uri: d.logo }} style={styles.businessLogo} resizeMode="contain" />
             ) : (
               <View style={styles.businessLogoPlaceholder}>
-                <Text style={styles.businessLogoPlaceholderText}>{displayName.slice(0, 2).toUpperCase()}</Text>
+                <Text style={styles.businessLogoPlaceholderText}>
+                  {displayName ? displayName.slice(0, 2).toUpperCase() : '—'}
+                </Text>
               </View>
             )}
             <View style={styles.businessTitleBlock}>
-              <Text style={styles.businessName}>{displayName}</Text>
+              <Text style={styles.businessName}>{displayName || '—'}</Text>
               {d?.website ? (
                 <TouchableOpacity onPress={() => Linking.openURL(d.website!)}>
                   <Text style={styles.businessWebsite} numberOfLines={1}>{d.website}</Text>
                 </TouchableOpacity>
-              ) : null}
+              ) : (
+                <Text style={styles.businessPlaceholder}>Add website</Text>
+              )}
             </View>
           </View>
-          {(d?.address || d?.phone || d?.email) ? (
-            <View style={styles.businessInfo}>
-              {d?.address ? <Text style={styles.businessLine}>{d.address}</Text> : null}
-              {d?.phone ? <Text style={styles.businessLine}>📞 {d.phone}</Text> : null}
-              {d?.email ? <Text style={styles.businessLine}>✉️ {d.email}</Text> : null}
+
+          {/* Rating & type */}
+          <View style={styles.businessInfoRow}>
+            <Text style={styles.businessInfoLabel}>Rating & type</Text>
+            <Text style={styles.businessLine}>—</Text>
+          </View>
+
+          {/* Address & distance */}
+          <View style={styles.businessInfoRow}>
+            <Text style={styles.businessInfoLabel}>Address</Text>
+            <Text style={styles.businessLine} numberOfLines={2}>
+              {d?.address || '—'}
+            </Text>
+            {d?.address ? <Text style={styles.businessDistance}>· 5.5 mi</Text> : null}
+          </View>
+
+          {/* Operating hours */}
+          <View style={styles.businessInfoRow}>
+            <Text style={styles.businessInfoLabel}>Hours</Text>
+            <View style={styles.businessHoursRow}>
+              <Text style={styles.businessLine}>—</Text>
+              <TouchableOpacity><Text style={styles.businessLink}> · More hours</Text></TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Contact */}
+          <View style={styles.businessInfoRow}>
+            <Text style={styles.businessInfoLabel}>Contact</Text>
+            {d?.phone ? (
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${d.phone}`)}>
+                <Text style={styles.businessLink}>📞 {d.phone}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.businessLine}>—</Text>
+            )}
+          </View>
+          {d?.email ? (
+            <View style={[styles.businessInfoRow, styles.businessInfoRowIndent]}>
+              <TouchableOpacity onPress={() => Linking.openURL(`mailto:${d.email}`)}>
+                <Text style={styles.businessLink}>✉️ {d.email}</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
+          {d?.whatsapp ? (
+            <View style={[styles.businessInfoRow, styles.businessInfoRowIndent]}>
+              <TouchableOpacity onPress={() => Linking.openURL(`https://wa.me/${String(d.whatsapp).replace(/\D/g, '')}`)}>
+                <Text style={styles.businessLink}>WhatsApp</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {/* Socials – template position */}
+          <View style={styles.businessInfoRow}>
+            <Text style={styles.businessInfoLabel}>Socials</Text>
+            {d?.socials && (d.socials.facebook || d.socials.instagram || d.socials.twitter || d.socials.tiktok || d.socials.linkedin) ? (
+              <View style={styles.businessSocialsRow}>
+                {d.socials.facebook ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('facebook', d.socials!.facebook!))}>
+                    <Text style={styles.businessLink}>Facebook</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {d.socials.instagram ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('instagram', d.socials!.instagram!))}>
+                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>Instagram</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {d.socials.twitter ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('twitter', d.socials!.twitter!))}>
+                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>X</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {d.socials.tiktok ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('tiktok', d.socials!.tiktok!))}>
+                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>TikTok</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {d.socials.linkedin ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('linkedin', d.socials!.linkedin!))}>
+                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>LinkedIn</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={styles.businessLine}>—</Text>
+            )}
+          </View>
+
+          {/* Image carousel – template position (placeholder until we have business photos) */}
+          <View style={styles.carouselSection}>
+            <Text style={styles.carouselTitle}>
+              {displayName ? displayName.toUpperCase().replace(/\s+/g, ' & ') : 'BUSINESS'}
+            </Text>
+            <View style={styles.carouselContainer}>
+              <TouchableOpacity
+                style={styles.carouselArrow}
+                onPress={() => setCarouselIndex((i) => Math.max(0, i - 1))}>
+                <Text style={styles.carouselArrowText}>‹</Text>
+              </TouchableOpacity>
+              <View style={styles.carouselSlide}>
+                <View style={styles.carouselPlaceholder}>
+                  <Text style={styles.carouselPlaceholderText}>Add photos</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.carouselArrow}
+                onPress={() => setCarouselIndex((i) => Math.min(carouselTotal - 1, i + 1))}>
+                <Text style={styles.carouselArrowText}>›</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.carouselCounter}>
+              {carouselIndex + 1}/{carouselTotal}
+            </Text>
+          </View>
+
+          {/* Map – template position (placeholder until we have location) */}
+          <View style={styles.mapSection}>
+            <Text style={styles.mapLabel}>Map</Text>
+            {d?.address ? (
+              <TouchableOpacity
+                style={styles.mapContainer}
+                onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
+                <View style={styles.mapPlaceholder}>
+                  <Text style={styles.mapPlaceholderText}>📍 {d.address}</Text>
+                  <Text style={styles.mapPlaceholderHint}>Tap for directions</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.mapContainer}>
+                <View style={styles.mapPlaceholder}>
+                  <Text style={styles.mapPlaceholderText}>Add location</Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Website & Directions – always visible */}
           <View style={styles.businessActions}>
             {d?.website ? (
-              <TouchableOpacity style={[styles.primaryButton, styles.primaryButtonSpacer]} onPress={() => Linking.openURL(d.website!)}>
+              <TouchableOpacity
+                style={[styles.primaryButton, styles.primaryButtonSpacer]}
+                onPress={() => Linking.openURL(d.website!)}>
                 <Text style={styles.primaryButtonText}>Website</Text>
               </TouchableOpacity>
-            ) : null}
+            ) : (
+              <View style={[styles.primaryButton, styles.primaryButtonSpacer, styles.primaryButtonDisabled]}>
+                <Text style={styles.primaryButtonTextDisabled}>Website</Text>
+              </View>
+            )}
             {d?.address ? (
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => Linking.openURL(googleMapsUrl(d!.address!))}>
+                onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
                 <Text style={styles.primaryButtonText}>Directions</Text>
               </TouchableOpacity>
-            ) : null}
+            ) : (
+              <View style={[styles.primaryButton, styles.primaryButtonDisabled]}>
+                <Text style={styles.primaryButtonTextDisabled}>Directions</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -543,9 +688,17 @@ const styles = StyleSheet.create({
   businessTitleBlock: { flex: 1 },
   businessName: { fontSize: 22, fontWeight: '700', color: Colors.text.primary, marginBottom: 4 },
   businessWebsite: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
-  businessInfo: { marginBottom: 12 },
-  businessLine: { fontSize: 14, color: Colors.text.secondary, marginBottom: 4 },
-  businessActions: { flexDirection: 'row', flexWrap: 'wrap' },
+  businessPlaceholder: { fontSize: 14, color: Colors.neutral[400], fontStyle: 'italic' },
+  businessInfoRow: { marginBottom: 10 },
+  businessInfoRowIndent: { marginLeft: 0, marginTop: -4 },
+  businessInfoLabel: { fontSize: 12, fontWeight: '600', color: Colors.neutral[500], marginBottom: 2 },
+  businessHoursRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  businessSocialsRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  businessSocialSpacer: { marginRight: 12 },
+  businessLine: { fontSize: 14, color: Colors.text.secondary },
+  businessDistance: { fontSize: 14, color: Colors.text.secondary, marginTop: 2 },
+  businessLink: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
+  businessActions: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 },
   primaryButton: {
     backgroundColor: '#0E7C86',
     paddingHorizontal: 20,
@@ -554,6 +707,49 @@ const styles = StyleSheet.create({
   },
   primaryButtonSpacer: { marginRight: 12 },
   primaryButtonText: { fontSize: 16, fontWeight: '600', color: Colors.background },
+  primaryButtonDisabled: { opacity: 0.5 },
+  primaryButtonTextDisabled: { fontSize: 16, fontWeight: '600', color: Colors.neutral[500] },
+  carouselSection: { marginTop: 20, marginBottom: 20 },
+  carouselTitle: { fontSize: 14, fontWeight: '700', color: Colors.text.secondary, marginBottom: 8 },
+  carouselContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  carouselArrow: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.neutral[200],
+    borderRadius: 22,
+  },
+  carouselArrowText: { fontSize: 28, fontWeight: '300', color: Colors.text.primary },
+  carouselSlide: { flex: 1, marginHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  carouselPlaceholder: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: Colors.neutral[200],
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  carouselPlaceholderText: { fontSize: 14, color: Colors.neutral[500] },
+  carouselCounter: { fontSize: 12, color: Colors.neutral[500], textAlign: 'center' },
+  mapSection: { marginTop: 16, marginBottom: 0 },
+  mapLabel: { fontSize: 12, fontWeight: '600', color: Colors.neutral[500], marginBottom: 8 },
+  mapContainer: { width: '100%', borderRadius: 8, overflow: 'hidden' },
+  mapPlaceholder: {
+    width: '100%',
+    aspectRatio: 2,
+    backgroundColor: Colors.neutral[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  mapPlaceholderText: { fontSize: 14, color: Colors.text.secondary, textAlign: 'center' },
+  mapPlaceholderHint: { fontSize: 12, color: Colors.primary, marginTop: 4 },
   section: { marginBottom: 32, paddingHorizontal: 16 },
   sectionHeader: {
     flexDirection: 'row',

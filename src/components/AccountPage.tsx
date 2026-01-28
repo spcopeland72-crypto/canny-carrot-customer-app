@@ -124,6 +124,10 @@ const AccountPage: React.FC<AccountPageProps> = ({
       const rewards = Array.isArray(record.rewards) ? record.rewards : [];
       const mapped = mapApiRewardsToLocal(rewards);
       await saveRewards(mapped);
+      const businessIds = [...new Set(
+        rewards.map((r: { businessId?: string }) => r.businessId).filter((id): id is string => !!id && id !== 'default')
+      )];
+      if (businessIds.length > 0) await pullBusinessDetailsForCustomer(businessIds);
       setHasCustomerId(true);
       setCustomerName(name || 'User');
       setCustomerEmail(record.email ?? email);

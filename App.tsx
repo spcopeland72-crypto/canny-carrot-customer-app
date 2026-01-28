@@ -208,6 +208,16 @@ function App(): React.JSX.Element {
         const rewardsList = Array.isArray(record.rewards) ? record.rewards : [];
         const mapped = mapApiRewardsToLocal(rewardsList);
         await saveRewards(mapped);
+
+        const businessIds = [...new Set(
+          rewardsList
+            .map((r: { businessId?: string }) => r.businessId)
+            .filter((id): id is string => !!id && id !== 'default')
+        )];
+        if (businessIds.length > 0) {
+          const { pulled, errors } = await pullBusinessDetailsForCustomer(businessIds);
+          if (errors.length > 0) console.warn('[App] Business details pull warnings:', errors);
+        }
       }
       const loaded = await loadRewards();
       setRewards(loaded || []);
@@ -336,6 +346,7 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onViewBusinessPage={handleViewBusinessPage}
             businessName={viewingBusiness.businessName}
             businessId={viewingBusiness.businessId}
           />

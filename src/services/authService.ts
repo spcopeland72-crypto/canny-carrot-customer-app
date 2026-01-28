@@ -68,9 +68,11 @@ export const logoutCustomer = async (): Promise<void> => {
   try {
     const { performCustomerFullSync } = await import('./customerLogout');
     const { clearCustomerId, storage } = await import('./localStorage');
+    const { clearBusinessDetails } = await import('./businessDetailsStorage');
     await performCustomerFullSync();
     await clearCustomerId();
     await storage.delete('customerRecord');
+    await clearBusinessDetails();
   } catch (e) {
     console.warn('[authService] Logout sync/clear error:', e);
   }
