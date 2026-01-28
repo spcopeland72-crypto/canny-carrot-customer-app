@@ -99,12 +99,15 @@ export async function fetchBusinessDetails(businessId: string): Promise<Business
       campaigns = [];
     }
 
+    const category = (biz.category ?? p.category ?? biz.businessType ?? (p as { businessType?: string }).businessType) as string | undefined;
+    const typeStr = category ? `${String(category)}` : undefined;
     const details: BusinessDetails = {
       id: String(biz.id ?? businessId),
       name: String(biz.name ?? p.name ?? ''),
       logo: (biz.logo ?? p.logo) as string | undefined,
       address: formatAddress(biz) || undefined,
       website: (biz.website ?? p.website) as string | undefined,
+      type: typeStr,
       socials: socials && Object.keys(socials).length > 0 ? socials : undefined,
       phone: (biz.phone ?? p.phone) as string | undefined,
       email: (biz.email ?? p.email) as string | undefined,

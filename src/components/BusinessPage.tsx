@@ -26,13 +26,31 @@ import {indexInList} from '../utils/campaignStampUtils';
 import {redeemReward} from '../services/customerRecord';
 import type {BusinessDetails} from '../types/businessDetails';
 
-const tickerText =
-  'Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers';
 const screenWidth = Dimensions.get('window').width || 375;
-const CARD_WIDTH = screenWidth * 0.42;
+const CARD_WIDTH = screenWidth * 0.25;
+
+const TICKER_TEXT = 'Canny Carrot welcomes our newest Silver Member Powder Butterfly and our latest Gold Member Blackwells Butchers';
 
 let logoImage: any = null;
-let ccIconImage: any = null;
+let stablesBannerImage: any = null;
+let facebookIcon: any;
+let instagramIcon: any;
+let tiktokIcon: any;
+let xIcon: any;
+let linkedinIcon: any;
+try {
+  stablesBannerImage = require('../../Images/stables banner.png');
+} catch { stablesBannerImage = null; }
+try {
+  facebookIcon = require('../../Images/facebook.png');
+  instagramIcon = require('../../Images/instagram.png');
+  tiktokIcon = require('../../Images/tiktok.png');
+  xIcon = require('../../Images/x.png');
+  linkedinIcon = require('../../Images/linkedin.png');
+} catch {
+  facebookIcon = instagramIcon = tiktokIcon = xIcon = linkedinIcon = null;
+}
+
 try {
   logoImage = require('../../assets/logo.png');
 } catch {
@@ -42,22 +60,6 @@ try {
     logoImage = null;
   }
 }
-try {
-  ccIconImage = require('../../assets/cc-icon-no-background.png');
-} catch {
-  ccIconImage = null;
-}
-let stablesBannerImage: any = null;
-try {
-  stablesBannerImage = require('../../Images/stables banner.png');
-} catch {
-  stablesBannerImage = null;
-}
-const facebookIcon = require('../../Images/facebook.png');
-const instagramIcon = require('../../Images/instagram.png');
-const tiktokIcon = require('../../Images/tiktok.png');
-const xIcon = require('../../Images/x.png');
-const linkedinIcon = require('../../Images/linkedin.png');
 
 interface BusinessPageProps {
   currentScreen: string;
@@ -125,7 +127,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
   const [selectedRewardForRedemption, setSelectedRewardForRedemption] = useState<RewardCard | null>(null);
   const [justRedeemedName, setJustRedeemedName] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
-  const carouselTotal = 1; // Placeholder: one slide until we have business photos
+  const carouselTotal = 1;
 
   const greeting = getTimeBasedGreeting();
 
@@ -279,225 +281,141 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Stables banner (View Business); social icons kept */}
+        {/* Stables banner – business banner instead of Canny Carrot */}
         <View style={styles.bannerSection}>
           {stablesBannerImage ? (
             <Image source={stablesBannerImage} style={styles.stablesBannerImage} resizeMode="cover" />
           ) : (
             <View style={styles.bannerFallback} />
           )}
-          <View style={styles.bannerSocialIconsOverlay}>
-            <View style={styles.socialIconsContainer}>
-              <TouchableOpacity style={[styles.socialIcon, { marginRight: 7 }]} onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
-                <Image source={facebookIcon} style={styles.socialIconImage} resizeMode="contain" />
+          <View style={styles.bannerSocialOverlay}>
+            {facebookIcon && (
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                <Image source={facebookIcon} style={styles.socialIconImg} resizeMode="contain" />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.socialIcon, { marginRight: 7 }]} onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
-                <Image source={instagramIcon} style={styles.socialIconImage} resizeMode="contain" />
+            )}
+            {instagramIcon && (
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                <Image source={instagramIcon} style={styles.socialIconImg} resizeMode="contain" />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.socialIcon, { marginRight: 7 }]} onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
-                <Image source={tiktokIcon} style={styles.socialIconImage} resizeMode="contain" />
+            )}
+            {tiktokIcon && (
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                <Image source={tiktokIcon} style={styles.socialIconImg} resizeMode="contain" />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.socialIcon, { marginRight: 7 }]} onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
-                <Image source={xIcon} style={styles.socialIconImage} resizeMode="contain" />
+            )}
+            {xIcon && (
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                <Image source={xIcon} style={styles.socialIconImg} resizeMode="contain" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
-                <Image source={linkedinIcon} style={styles.socialIconImage} resizeMode="contain" />
+            )}
+            {linkedinIcon && (
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                <Image source={linkedinIcon} style={styles.socialIconImg} resizeMode="contain" />
               </TouchableOpacity>
-            </View>
+            )}
           </View>
         </View>
 
         {/* Ticker */}
         <View style={styles.tickerWrap}>
-          <Text style={styles.tickerItem} numberOfLines={1}>{tickerText}</Text>
+          <Text style={styles.tickerItem} numberOfLines={1}>{TICKER_TEXT}</Text>
         </View>
 
-        {/* Business details – all template slots; placeholders when data missing */}
-        <View style={styles.businessSection}>
-          <View style={styles.businessHeader}>
-            {d?.logo ? (
-              <Image source={{ uri: d.logo }} style={styles.businessLogo} resizeMode="contain" />
-            ) : (
-              <View style={styles.businessLogoPlaceholder}>
-                <Text style={styles.businessLogoPlaceholderText}>
-                  {displayName ? displayName.slice(0, 2).toUpperCase() : '—'}
-                </Text>
-              </View>
-            )}
-            <View style={styles.businessTitleBlock}>
-              <Text style={styles.businessName}>{displayName || '—'}</Text>
-              {d?.website ? (
-                <TouchableOpacity onPress={() => Linking.openURL(d.website!)}>
-                  <Text style={styles.businessWebsite} numberOfLines={1}>{d.website}</Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={styles.businessPlaceholder}>Add website</Text>
-              )}
-            </View>
+        {/* Google Business listing format */}
+        <View style={styles.gmbSection}>
+          <Text style={styles.gmbName}>{displayName}</Text>
+          {d?.website ? (
+            <TouchableOpacity onPress={() => Linking.openURL(d.website!)}>
+              <Text style={styles.gmbWebsite} numberOfLines={1}>{d.website}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.gmbWebsitePlaceholder}>Add website</Text>
+          )}
+
+          <View style={styles.gmbRatingRow}>
+            <Text style={styles.gmbRating}>5/5 (1 review)</Text>
+            <Text style={styles.gmbDot}> · </Text>
+            <Text style={styles.gmbType}>{d?.type || '—'}</Text>
           </View>
 
-          {/* Rating & type */}
-          <View style={styles.businessInfoRow}>
-            <Text style={styles.businessInfoLabel}>Rating & type</Text>
-            <Text style={styles.businessLine}>—</Text>
+          <View style={styles.gmbAddressRow}>
+            <Text style={styles.gmbAddress} numberOfLines={2}>{d?.address || '—'}</Text>
+            {d?.address ? <Text style={styles.gmbDistance}> · 5.5 mi</Text> : null}
           </View>
 
-          {/* Address & distance */}
-          <View style={styles.businessInfoRow}>
-            <Text style={styles.businessInfoLabel}>Address</Text>
-            <Text style={styles.businessLine} numberOfLines={2}>
-              {d?.address || '—'}
-            </Text>
-            {d?.address ? <Text style={styles.businessDistance}>· 5.5 mi</Text> : null}
+          <View style={styles.gmbHoursRow}>
+            <Text style={styles.gmbHours}>—</Text>
+            <TouchableOpacity><Text style={styles.gmbHoursLink}> · More hours</Text></TouchableOpacity>
           </View>
 
-          {/* Operating hours */}
-          <View style={styles.businessInfoRow}>
-            <Text style={styles.businessInfoLabel}>Hours</Text>
-            <View style={styles.businessHoursRow}>
-              <Text style={styles.businessLine}>—</Text>
-              <TouchableOpacity><Text style={styles.businessLink}> · More hours</Text></TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Contact */}
-          <View style={styles.businessInfoRow}>
-            <Text style={styles.businessInfoLabel}>Contact</Text>
+          <View style={styles.gmbContactBlock}>
             {d?.phone ? (
               <TouchableOpacity onPress={() => Linking.openURL(`tel:${d.phone}`)}>
-                <Text style={styles.businessLink}>📞 {d.phone}</Text>
+                <Text style={styles.gmbContactLink}>{d.phone}</Text>
               </TouchableOpacity>
             ) : (
-              <Text style={styles.businessLine}>—</Text>
+              <Text style={styles.gmbContact}>—</Text>
             )}
-          </View>
-          {d?.email ? (
-            <View style={[styles.businessInfoRow, styles.businessInfoRowIndent]}>
+            {d?.email ? (
               <TouchableOpacity onPress={() => Linking.openURL(`mailto:${d.email}`)}>
-                <Text style={styles.businessLink}>✉️ {d.email}</Text>
+                <Text style={styles.gmbContactLink}>{d.email}</Text>
               </TouchableOpacity>
-            </View>
-          ) : null}
-          {d?.whatsapp ? (
-            <View style={[styles.businessInfoRow, styles.businessInfoRowIndent]}>
+            ) : null}
+            {d?.whatsapp ? (
               <TouchableOpacity onPress={() => Linking.openURL(`https://wa.me/${String(d.whatsapp).replace(/\D/g, '')}`)}>
-                <Text style={styles.businessLink}>WhatsApp</Text>
+                <Text style={styles.gmbContactLink}>WhatsApp</Text>
               </TouchableOpacity>
-            </View>
-          ) : null}
-
-          {/* Socials – template position */}
-          <View style={styles.businessInfoRow}>
-            <Text style={styles.businessInfoLabel}>Socials</Text>
-            {d?.socials && (d.socials.facebook || d.socials.instagram || d.socials.twitter || d.socials.tiktok || d.socials.linkedin) ? (
-              <View style={styles.businessSocialsRow}>
-                {d.socials.facebook ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('facebook', d.socials!.facebook!))}>
-                    <Text style={styles.businessLink}>Facebook</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {d.socials.instagram ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('instagram', d.socials!.instagram!))}>
-                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>Instagram</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {d.socials.twitter ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('twitter', d.socials!.twitter!))}>
-                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>X</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {d.socials.tiktok ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('tiktok', d.socials!.tiktok!))}>
-                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>TikTok</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {d.socials.linkedin ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(socialUrl('linkedin', d.socials!.linkedin!))}>
-                    <Text style={[styles.businessLink, styles.businessSocialSpacer]}>LinkedIn</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ) : (
-              <Text style={styles.businessLine}>—</Text>
-            )}
+            ) : null}
           </View>
 
-          {/* Image carousel – template position (placeholder until we have business photos) */}
-          <View style={styles.carouselSection}>
-            <Text style={styles.carouselTitle}>
-              {displayName ? displayName.toUpperCase().replace(/\s+/g, ' & ') : 'BUSINESS'}
-            </Text>
-            <View style={styles.carouselContainer}>
-              <TouchableOpacity
-                style={styles.carouselArrow}
-                onPress={() => setCarouselIndex((i) => Math.max(0, i - 1))}>
-                <Text style={styles.carouselArrowText}>‹</Text>
-              </TouchableOpacity>
-              <View style={styles.carouselSlide}>
-                <View style={styles.carouselPlaceholder}>
-                  <Text style={styles.carouselPlaceholderText}>Add photos</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.carouselArrow}
-                onPress={() => setCarouselIndex((i) => Math.min(carouselTotal - 1, i + 1))}>
-                <Text style={styles.carouselArrowText}>›</Text>
-              </TouchableOpacity>
+          {/* Image carousel – GMB style */}
+          <Text style={styles.carouselTitle}>{(displayName || 'Business').toUpperCase().replace(/\s+/g, ' & ')}</Text>
+          <View style={styles.carouselRow}>
+            <TouchableOpacity style={styles.carouselArrow} onPress={() => setCarouselIndex((i) => Math.max(0, i - 1))}>
+              <Text style={styles.carouselArrowText}>‹</Text>
+            </TouchableOpacity>
+            <View style={styles.carouselSlide}>
+              <View style={styles.carouselPlaceholder}><Text style={styles.carouselPlaceholderText}>Add photos</Text></View>
             </View>
-            <Text style={styles.carouselCounter}>
-              {carouselIndex + 1}/{carouselTotal}
-            </Text>
+            <TouchableOpacity style={styles.carouselArrow} onPress={() => setCarouselIndex((i) => Math.min(carouselTotal - 1, i + 1))}>
+              <Text style={styles.carouselArrowText}>›</Text>
+            </TouchableOpacity>
           </View>
+          <Text style={styles.carouselCounter}>{carouselIndex + 1}/{carouselTotal}</Text>
 
-          {/* Map – template position (placeholder until we have location) */}
-          <View style={styles.mapSection}>
-            <Text style={styles.mapLabel}>Map</Text>
+          {/* Map – GMB style */}
+          <Text style={styles.mapLabel}>Map</Text>
+          <View style={styles.mapWrap}>
             {d?.address ? (
-              <TouchableOpacity
-                style={styles.mapContainer}
-                onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
-                <View style={styles.mapPlaceholder}>
-                  <Text style={styles.mapPlaceholderText}>📍 {d.address}</Text>
-                  <Text style={styles.mapPlaceholderHint}>Tap for directions</Text>
-                </View>
+              <TouchableOpacity style={styles.mapBox} onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
+                <Text style={styles.mapPlaceholderText}>📍 {d.address}</Text>
+                <Text style={styles.mapHint}>Tap for directions</Text>
               </TouchableOpacity>
             ) : (
-              <View style={styles.mapContainer}>
-                <View style={styles.mapPlaceholder}>
-                  <Text style={styles.mapPlaceholderText}>Add location</Text>
-                </View>
-              </View>
+              <View style={styles.mapBox}><Text style={styles.mapPlaceholderText}>Add location</Text></View>
             )}
           </View>
 
-          {/* Website & Directions – always visible */}
-          <View style={styles.businessActions}>
+          <View style={styles.gmbActions}>
             {d?.website ? (
-              <TouchableOpacity
-                style={[styles.primaryButton, styles.primaryButtonSpacer]}
-                onPress={() => Linking.openURL(d.website!)}>
-                <Text style={styles.primaryButtonText}>Website</Text>
+              <TouchableOpacity style={[styles.gmbBtn, styles.gmbBtnSpacer]} onPress={() => Linking.openURL(d.website!)}>
+                <Text style={styles.gmbBtnText}>Website</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.primaryButton, styles.primaryButtonSpacer, styles.primaryButtonDisabled]}>
-                <Text style={styles.primaryButtonTextDisabled}>Website</Text>
-              </View>
+              <View style={[styles.gmbBtn, styles.gmbBtnSpacer, styles.gmbBtnDisabled]}><Text style={styles.gmbBtnTextDisabled}>Website</Text></View>
             )}
             {d?.address ? (
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
-                <Text style={styles.primaryButtonText}>Directions</Text>
+              <TouchableOpacity style={styles.gmbBtn} onPress={() => Linking.openURL(googleMapsUrl(d.address!))}>
+                <Text style={styles.gmbBtnText}>Directions</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.primaryButton, styles.primaryButtonDisabled]}>
-                <Text style={styles.primaryButtonTextDisabled}>Directions</Text>
-              </View>
+              <View style={[styles.gmbBtn, styles.gmbBtnDisabled]}><Text style={styles.gmbBtnTextDisabled}>Directions</Text></View>
             )}
           </View>
         </View>
 
-        {/* REWARDS – user's rewards/campaigns with this business */}
+        {/* REWARDS – horizontal carousel as per image */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>REWARDS</Text>
@@ -508,38 +426,32 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
           {rewardCards.length === 0 ? (
             <Text style={styles.empty}>No rewards or campaigns with this business yet.</Text>
           ) : (
-            <View style={styles.rewardsGrid}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}>
               {rewardCards.map((card) => {
                 const total = Math.max(1, card.total);
                 const earned = Math.min(card.count, total);
                 return (
-                  <TouchableOpacity
-                    key={card.id}
-                    style={styles.rewardCard}
-                    onPress={() => handleRewardPress(card)}>
-                    <Text style={styles.rewardTitle} numberOfLines={1}>
-                      {card.title}
-                    </Text>
+                  <TouchableOpacity key={card.id} style={styles.rewardCard} onPress={() => handleRewardPress(card)}>
+                    <Text style={styles.rewardTitle} numberOfLines={1}>{card.title}</Text>
                     <View style={styles.rewardProgressContainer}>
                       <CampaignProgressCircle
                         earned={earned}
                         total={total}
-                        size={72}
+                        size={80}
                         circleColor={card.id.startsWith('campaign-') ? '#74A71C' : undefined}
                       />
                       {card.isEarned && (
-                        <View style={styles.redeemBadge}>
-                          <Text style={styles.redeemBadgeText}>🎁</Text>
-                        </View>
+                        <View style={styles.redeemBadge}><Text style={styles.redeemBadgeText}>🎁</Text></View>
                       )}
                     </View>
-                    {card.businessName ? (
-                      <Text style={styles.rewardBusinessName} numberOfLines={1}>{card.businessName}</Text>
-                    ) : null}
+                    {card.businessName ? <Text style={styles.rewardBusinessName} numberOfLines={1}>{card.businessName}</Text> : null}
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )}
         </View>
       </ScrollView>
@@ -630,101 +542,50 @@ const styles = StyleSheet.create({
   iconText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
-  bannerSection: {
-    width: '100%',
-    position: 'relative',
-    marginBottom: 0,
-  },
-  stablesBannerImage: {
-    width: '100%',
-    height: 140,
-  },
-  bannerFallback: {
-    width: '100%',
-    height: 140,
-    backgroundColor: Colors.neutral[200],
-  },
-  bannerSocialIconsOverlay: {
+  bannerSection: { width: '100%', position: 'relative', marginBottom: 0 },
+  stablesBannerImage: { width: '100%', height: 171 },
+  bannerFallback: { width: '100%', height: 171, backgroundColor: '#74A71C' },
+  bannerSocialOverlay: {
     position: 'absolute',
     bottom: 12,
-    left: 16,
-    right: 16,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     zIndex: 10,
   },
-  socialIconsContainer: { flexDirection: 'row', alignItems: 'center' },
-  socialIcon: { width: 27, height: 27, justifyContent: 'center', alignItems: 'center' },
-  socialIconImage: { width: 27, height: 27 },
+  socialIconBtn: { width: 27, height: 27, marginRight: 7, justifyContent: 'center', alignItems: 'center' },
+  socialIconImg: { width: 27, height: 27 },
   tickerWrap: {
     width: '100%',
+    height: 45,
     backgroundColor: '#9E8F85',
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 24,
-  },
-  tickerItem: { fontSize: 16, color: 'white', flexShrink: 0 },
-  businessSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  businessHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  businessLogo: { width: 64, height: 64, borderRadius: 8, marginRight: 16 },
-  businessLogoPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: Colors.neutral[200],
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
   },
-  businessLogoPlaceholderText: { fontSize: 20, fontWeight: '700', color: Colors.neutral[600] },
-  businessTitleBlock: { flex: 1 },
-  businessName: { fontSize: 22, fontWeight: '700', color: Colors.text.primary, marginBottom: 4 },
-  businessWebsite: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
-  businessPlaceholder: { fontSize: 14, color: Colors.neutral[400], fontStyle: 'italic' },
-  businessInfoRow: { marginBottom: 10 },
-  businessInfoRowIndent: { marginLeft: 0, marginTop: -4 },
-  businessInfoLabel: { fontSize: 12, fontWeight: '600', color: Colors.neutral[500], marginBottom: 2 },
-  businessHoursRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
-  businessSocialsRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  businessSocialSpacer: { marginRight: 12 },
-  businessLine: { fontSize: 14, color: Colors.text.secondary },
-  businessDistance: { fontSize: 14, color: Colors.text.secondary, marginTop: 2 },
-  businessLink: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
-  businessActions: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 },
-  primaryButton: {
-    backgroundColor: '#0E7C86',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  primaryButtonSpacer: { marginRight: 12 },
-  primaryButtonText: { fontSize: 16, fontWeight: '600', color: Colors.background },
-  primaryButtonDisabled: { opacity: 0.5 },
-  primaryButtonTextDisabled: { fontSize: 16, fontWeight: '600', color: Colors.neutral[500] },
-  carouselSection: { marginTop: 20, marginBottom: 20 },
+  tickerItem: { fontSize: 26, color: 'white', flexShrink: 0 },
+  gmbSection: { paddingHorizontal: 16, paddingBottom: 24, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.neutral[200] },
+  gmbName: { fontSize: 24, fontWeight: '700', color: Colors.text.primary, marginBottom: 4 },
+  gmbWebsite: { fontSize: 14, color: '#1a73e8', fontWeight: '500', marginBottom: 8 },
+  gmbWebsitePlaceholder: { fontSize: 14, color: Colors.neutral[400], fontStyle: 'italic', marginBottom: 8 },
+  gmbRatingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  gmbRating: { fontSize: 14, color: '#0E7C86', fontWeight: '600' },
+  gmbDot: { fontSize: 14, color: Colors.text.secondary },
+  gmbType: { fontSize: 14, color: Colors.text.secondary },
+  gmbAddressRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
+  gmbAddress: { fontSize: 14, color: Colors.text.secondary },
+  gmbDistance: { fontSize: 14, color: Colors.text.secondary },
+  gmbHoursRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  gmbHours: { fontSize: 14, color: Colors.text.secondary },
+  gmbHoursLink: { fontSize: 14, color: '#1a73e8', fontWeight: '500' },
+  gmbContactBlock: { marginBottom: 16 },
+  gmbContact: { fontSize: 14, color: Colors.text.secondary },
+  gmbContactLink: { fontSize: 14, color: '#1a73e8', fontWeight: '500', marginBottom: 4 },
   carouselTitle: { fontSize: 14, fontWeight: '700', color: Colors.text.secondary, marginBottom: 8 },
-  carouselContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  carouselArrow: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.neutral[200],
-    borderRadius: 22,
-  },
+  carouselRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  carouselArrow: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.neutral[200], justifyContent: 'center', alignItems: 'center' },
   carouselArrowText: { fontSize: 28, fontWeight: '300', color: Colors.text.primary },
   carouselSlide: { flex: 1, marginHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
   carouselPlaceholder: {
@@ -736,20 +597,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   carouselPlaceholderText: { fontSize: 14, color: Colors.neutral[500] },
-  carouselCounter: { fontSize: 12, color: Colors.neutral[500], textAlign: 'center' },
-  mapSection: { marginTop: 16, marginBottom: 0 },
+  carouselCounter: { fontSize: 12, color: Colors.neutral[500], textAlign: 'center', marginBottom: 8 },
   mapLabel: { fontSize: 12, fontWeight: '600', color: Colors.neutral[500], marginBottom: 8 },
-  mapContainer: { width: '100%', borderRadius: 8, overflow: 'hidden' },
-  mapPlaceholder: {
+  mapWrap: { marginBottom: 16 },
+  mapBox: {
     width: '100%',
     aspectRatio: 2,
     backgroundColor: Colors.neutral[200],
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   mapPlaceholderText: { fontSize: 14, color: Colors.text.secondary, textAlign: 'center' },
-  mapPlaceholderHint: { fontSize: 12, color: Colors.primary, marginTop: 4 },
+  mapHint: { fontSize: 12, color: '#1a73e8', marginTop: 4 },
+  gmbActions: { flexDirection: 'row', flexWrap: 'wrap' },
+  gmbBtn: { backgroundColor: '#1a73e8', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
+  gmbBtnSpacer: { marginRight: 12 },
+  gmbBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  gmbBtnDisabled: { opacity: 0.5 },
+  gmbBtnTextDisabled: { fontSize: 16, fontWeight: '600', color: Colors.neutral[500] },
   section: { marginBottom: 32, paddingHorizontal: 16 },
   sectionHeader: {
     flexDirection: 'row',
@@ -760,7 +627,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.primary },
   sectionLink: {
     fontSize: 16,
-    color: Colors.background,
+    color: '#fff',
     fontWeight: 'bold',
     backgroundColor: Colors.secondary,
     paddingHorizontal: 16,
@@ -768,15 +635,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-  rewardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
+  carouselContent: { paddingRight: 16 },
   rewardCard: {
     width: CARD_WIDTH,
     alignItems: 'center',
-    marginBottom: 20,
+    marginRight: 12,
   },
   rewardTitle: {
     fontSize: 12,
@@ -799,18 +662,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   redeemBadgeText: { fontSize: 14 },
-  rewardBusinessName: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
-  empty: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    marginTop: 16,
-  },
+  rewardBusinessName: { fontSize: 11, fontWeight: '700', color: Colors.text.secondary, textAlign: 'center' },
+  empty: { fontSize: 16, color: Colors.text.secondary, textAlign: 'center', marginTop: 16 },
 });
 
 export default BusinessPage;

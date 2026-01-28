@@ -17,6 +17,8 @@ export interface BusinessDetails {
   logo?: string;
   address?: string;
   website?: string;
+  /** e.g. "Butcher shop in Stockton-on-Tees" */
+  type?: string;
   socials?: BusinessSocials;
   phone?: string;
   email?: string;
