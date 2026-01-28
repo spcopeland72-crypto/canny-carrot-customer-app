@@ -221,6 +221,7 @@ interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
   onScanPress?: () => void;
   onViewBusinessPage?: (businessName: string, businessId?: string) => void;
+  onLogout?: () => void;
   rewards?: Array<{
     id: string;
     name: string;
@@ -1105,9 +1106,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={accountModalVisible}
         onClose={() => setAccountModalVisible(false)}
         onNavigate={onNavigate}
-        onLogout={() => {
-          onNavigate('Welcome');
-        }}
+        onLogout={onLogout}
         customerName={userName}
         customerEmail=""
       />

@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import {Alert} from 'react-native';
-import {performCustomerFullSync} from '../services/customerLogout';
-import {clearCustomerId, storage} from '../services/localStorage';
+import { logoutCustomer } from '../services/authService';
+import { performCustomerFullSync } from '../services/customerLogout';
 
 interface AccountModalProps {
   visible: boolean;
@@ -51,22 +51,11 @@ const AccountModal: React.FC<AccountModalProps> = ({
   const handleLogout = async () => {
     try {
       onClose();
-      console.log('🔄 [CUSTOMER LOGOUT] Starting logout with full sync...');
-
-      const syncResult = await performCustomerFullSync();
-      if (syncResult.success) {
-        console.log('✅ [CUSTOMER LOGOUT] Full replacement sync completed successfully');
-      } else {
-        console.warn('⚠️ [CUSTOMER LOGOUT] Some data failed to sync:', syncResult.errors);
-      }
-
-      await clearCustomerId();
-      await storage.delete('customerRecord');
-      console.log('✅ [CUSTOMER LOGOUT] Logged out successfully');
-
+      await logoutCustomer();
       if (onLogout) onLogout();
     } catch (error) {
       console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
+      if (onLogout) onLogout();
     }
   };
 

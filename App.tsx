@@ -31,6 +31,11 @@ if (Platform.OS === 'web' && typeof console !== 'undefined') {
 }
 import HomeScreen from './src/components/HomeScreen';
 import {loadRewards, saveRewards, type CustomerReward} from './src/utils/dataStorage';
+import {getStoredAuth} from './src/services/authService';
+import {getById} from './src/services/customerApi';
+import {setCustomerId} from './src/services/localStorage';
+import {updateCustomerProfile} from './src/services/customerRecord';
+import {mapApiRewardsToLocal} from './src/utils/customerRewardMapping';
 import SearchPage from './src/components/SearchPage';
 import GeoSearchPage from './src/components/GeoSearch/GeoSearchPage';
 import ScanPage from './src/components/ScanPage';
@@ -60,6 +65,7 @@ import ReferEarnPage from './src/components/ReferEarnPage';
 import LunchOnTheGoPage from './src/components/LunchOnTheGoPage';
 import SeasonalSpecialsPage from './src/components/SeasonalSpecialsPage';
 import ScanModal from './src/components/ScanModal';
+import LoginPage from './src/components/LoginPage';
 import PersonalDetailsPage from './src/components/PersonalDetailsPage';
 import CommunicationPreferencesPage from './src/components/CommunicationPreferencesPage';
 import YourOrdersPage from './src/components/YourOrdersPage';
@@ -77,79 +83,59 @@ function App(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [viewingBusiness, setViewingBusiness] = useState<{ businessName: string; businessId?: string } | null>(null);
-  
-  // Log when component mounts
+  const [isAuthenticatedState, setIsAuthenticatedState] = useState<boolean | null>(null);
+
+  // Auth check on mount — same as business: always show login screen to start
   useEffect(() => {
-    console.log('[App] Component mounted');
-    console.log('[App] Platform:', Platform.OS);
-    return () => {
-      console.log('[App] Component unmounting');
+    const checkAuth = async () => {
+      try {
+        setIsAuthenticatedState(false);
+      } catch (e) {
+        console.error('[App] Auth check error:', e);
+        setIsAuthenticatedState(false);
+      } finally {
+        setIsLoading(false);
+      }
     };
+    checkAuth();
   }, []);
 
-  // Load rewards on mount and when rewards change
+  // Load rewards on mount and when switching to Home (only when authenticated)
   useEffect(() => {
+    if (isAuthenticatedState !== true) return;
     let isMounted = true;
     const loadData = async () => {
       try {
-        // Add timeout to loadRewards call itself
         const loadPromise = loadRewards();
-        const timeoutPromise = new Promise<CustomerReward[]>((resolve) => {
-          setTimeout(() => {
-            console.warn('[App] Load rewards timeout, using empty array');
-            resolve([]);
-          }, 3000);
-        });
-        
-        const loadedRewards = await Promise.race([loadPromise, timeoutPromise]);
-        
+        const timeoutPromise = new Promise<CustomerReward[]>((r) =>
+          setTimeout(() => { console.warn('[App] Load rewards timeout'); r([]); }, 3000)
+        );
+        const loaded = await Promise.race([loadPromise, timeoutPromise]);
         if (isMounted) {
-          console.log('[App] Loaded rewards on mount:', loadedRewards?.length || 0, 'rewards');
-          setRewards(loadedRewards || []);
-          setIsLoading(false);
+          setRewards(loaded || []);
           setHasError(false);
         }
-      } catch (error) {
-        console.error('[App] Error loading rewards:', error);
-        if (isMounted) {
-          setRewards([]);
-          setIsLoading(false);
-          setHasError(true);
-        }
+      } catch (e) {
+        console.error('[App] Error loading rewards:', e);
+        if (isMounted) { setRewards([]); setHasError(true); }
       }
     };
-    
     loadData();
-    
-    // Fallback timeout - always clear loading after 5 seconds
-    const fallbackTimeout = setTimeout(() => {
-      if (isMounted) {
-        console.warn('[App] Fallback timeout: forcing loading state to false');
-        setIsLoading(false);
-      }
-    }, 5000);
-    
-    return () => {
-      isMounted = false;
-      clearTimeout(fallbackTimeout);
-    };
-  }, []);
+    return () => { isMounted = false; };
+  }, [isAuthenticatedState]);
   
-  // Also reload rewards when screen changes to Home (in case rewards were updated)
   useEffect(() => {
-    if (currentScreen === 'Home') {
-      const reloadRewards = async () => {
-        try {
-          const loadedRewards = await loadRewards();
-          console.log('[App] Reloaded rewards on Home screen:', loadedRewards.length, 'rewards');
-          setRewards(loadedRewards || []);
-        } catch (error) {
-          console.error('Error reloading rewards:', error);
-        }
-      };
-      reloadRewards();
-    }
-  }, [currentScreen]);
+    if (isAuthenticatedState !== true || currentScreen !== 'Home') return;
+    const reload = async () => {
+      try {
+        const loaded = await loadRewards();
+        setRewards(loaded || []);
+      } catch (e) {
+        console.error('[App] Reload rewards:', e);
+      }
+    };
+    reload();
+  }, [isAuthenticatedState, currentScreen]);
 
   // Handle reward scanned callback
   const handleRewardScanned = async (reward: CustomerReward) => {
@@ -205,6 +191,45 @@ function App(): React.JSX.Element {
     setScanModalVisible(true);
   };
 
+  const handleLoginSuccess = async () => {
+    try {
+      const auth = await getStoredAuth();
+      if (!auth?.customerId) return;
+      await setCustomerId(auth.customerId);
+      const record = await getById(auth.customerId);
+      if (record) {
+        const name = [record.firstName, record.lastName].filter(Boolean).join(' ').trim();
+        await updateCustomerProfile({
+          id: record.id,
+          name: name || undefined,
+          email: record.email ?? auth.email,
+          phone: record.phone,
+        });
+        const rewardsList = Array.isArray(record.rewards) ? record.rewards : [];
+        const mapped = mapApiRewardsToLocal(rewardsList);
+        await saveRewards(mapped);
+      }
+      const loaded = await loadRewards();
+      setRewards(loaded || []);
+      setIsAuthenticatedState(true);
+    } catch (e) {
+      console.error('[App] Login success hydrate error:', e);
+      setIsAuthenticatedState(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { logoutCustomer } = await import('./src/services/authService');
+      await logoutCustomer();
+    } catch (e) {
+      console.error('[App] Logout error:', e);
+    } finally {
+      setIsAuthenticatedState(false);
+      setCurrentScreen('Home');
+    }
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'Home':
@@ -214,6 +239,7 @@ function App(): React.JSX.Element {
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
             onViewBusinessPage={handleViewBusinessPage}
+            onLogout={handleLogout}
             rewards={rewards}
           />
         );
@@ -606,34 +632,31 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onViewBusinessPage={handleViewBusinessPage}
+            onLogout={handleLogout}
+            rewards={rewards}
           />
         );
     }
   };
 
-  // Show loading state with visible indicator
   if (isLoading) {
     return (
-      <View style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: '#fff', 
-        minHeight: '100vh',
-        padding: 20
-      }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', minHeight: '100vh', padding: 20 }}>
         <Text style={{ fontSize: 18, color: '#000', fontWeight: 'bold', marginBottom: 10 }}>Canny Carrot</Text>
         <Text style={{ fontSize: 16, color: '#666' }}>Loading...</Text>
       </View>
     );
   }
-  
-  // Show error state if needed (fallback)
+
+  if (isAuthenticatedState === null || isAuthenticatedState === false) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   if (hasError && rewards.length === 0 && currentScreen === 'Home') {
     console.warn('[App] Showing error fallback - continuing anyway');
   }
 
-  // Ensure screen always renders - fallback if renderScreen returns null
   const screenContent = renderScreen();
   if (!screenContent) {
     console.error('[App] renderScreen returned null/undefined, falling back to HomeScreen');
@@ -642,6 +665,8 @@ function App(): React.JSX.Element {
         currentScreen="Home"
         onNavigate={handleNavigate}
         onScanPress={handleScanPress}
+        onViewBusinessPage={handleViewBusinessPage}
+        onLogout={handleLogout}
         rewards={rewards}
       />
     );

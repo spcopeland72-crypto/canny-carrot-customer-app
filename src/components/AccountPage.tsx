@@ -16,6 +16,8 @@ import BottomNavigation from './BottomNavigation';
 import {getCustomerRecord, updateCustomerProfile} from '../services/customerRecord';
 import {getCustomerId, setCustomerId} from '../services/localStorage';
 import {getByEmail} from '../services/customerApi';
+import {saveRewards} from '../utils/dataStorage';
+import {mapApiRewardsToLocal} from '../utils/customerRewardMapping';
 
 interface AccountPageProps {
   currentScreen: string;
@@ -76,10 +78,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
         }
         
         if (record && record.profile) {
-          const fullName = record.profile.name?.trim()
-            || (record.profile.firstName && record.profile.lastName
-              ? `${record.profile.firstName} ${record.profile.lastName}`
-              : (record.profile.firstName || record.profile.lastName || 'User'));
+          const fullName = (record.profile.name ?? '').trim() || 'User';
           setCustomerName(fullName);
           setCustomerEmail(record.profile.email || 'No email set');
         } else {
@@ -116,17 +115,24 @@ const AccountPage: React.FC<AccountPageProps> = ({
       }
       await setCustomerId(record.id);
       const name = [record.firstName, record.lastName].filter(Boolean).join(' ').trim();
-      if (name || record.email) {
-        await updateCustomerProfile({
-          name: name || undefined,
-          email: record.email ?? email,
-        });
-      }
+      await updateCustomerProfile({
+        id: record.id,
+        name: name || undefined,
+        email: record.email ?? email,
+        phone: record.phone,
+      });
+      const rewards = Array.isArray(record.rewards) ? record.rewards : [];
+      const mapped = mapApiRewardsToLocal(rewards);
+      await saveRewards(mapped);
       setHasCustomerId(true);
       setCustomerName(name || 'User');
       setCustomerEmail(record.email ?? email);
       setSignInEmail('');
-      Alert.alert('Signed in', `Welcome, ${name || email}`);
+      Alert.alert(
+        'Signed in',
+        `Welcome, ${name || email}. Your rewards have been loaded.`,
+        [{ text: 'OK', onPress: () => onNavigate('Home') }]
+      );
     } catch (e) {
       setSignInError(e instanceof Error ? e.message : 'Sign in failed');
     } finally {
