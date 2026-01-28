@@ -44,8 +44,10 @@ export const saveCustomerRecord = async (record: CustomerRecord): Promise<void> 
   record.updatedAt = new Date().toISOString();
   await storage.set(CUSTOMER_RECORD_KEY, record);
   
-  // Queue sync to Redis
-  await queueOperation('update', 'customer', record.profile.id, record);
+  const customerId = record.profile?.id;
+  if (customerId) {
+    await queueOperation('update', 'customer', customerId, record);
+  }
 };
 
 /**

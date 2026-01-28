@@ -32,8 +32,10 @@ const AccountModal: React.FC<AccountModalProps> = ({
 }) => {
   const [syncing, setSyncing] = useState(false);
 
+  // Match business CompanyMenuModal: Sync only on Sync click, login, logout.
   const handleSync = async () => {
     try {
+      onClose();
       setSyncing(true);
       const syncResult = await performCustomerFullSync();
       if (syncResult.success) {
@@ -50,24 +52,26 @@ const AccountModal: React.FC<AccountModalProps> = ({
 
   const handleLogout = async () => {
     try {
-      onClose();
       await logoutCustomer();
-      if (onLogout) onLogout();
+      onClose();
+      if (onLogout) {
+        onLogout();
+      }
     } catch (error) {
       console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
-      if (onLogout) onLogout();
+      if (onLogout) {
+        onLogout();
+      }
     }
   };
 
   const handleMenuAction = (action: string) => {
-    if (action === 'sync') {
-      handleSync();
-      return;
-    }
-    onClose();
     if (action === 'logout') {
       handleLogout();
+    } else if (action === 'sync') {
+      handleSync();
     } else {
+      onClose();
       onNavigate(action);
     }
   };

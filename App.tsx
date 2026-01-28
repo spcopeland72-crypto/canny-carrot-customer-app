@@ -344,6 +344,8 @@ function App(): React.JSX.Element {
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onScanPress={handleScanPress}
+            onViewBusinessPage={handleViewBusinessPage}
+            onLogout={handleLogout}
             rewards={rewards}
           />
         );

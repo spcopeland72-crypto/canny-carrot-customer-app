@@ -247,6 +247,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate = () => {},
   onScanPress = () => {},
   onViewBusinessPage,
+  onLogout = () => {},
   rewards: propsRewards = [],
 }) => {
   const [userName] = useState('Simon'); // This would come from user context

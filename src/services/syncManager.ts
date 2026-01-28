@@ -85,8 +85,17 @@ const syncEntityToRedis = async (
     const { entityType, entityId, type, data } = operation;
 
     if (type === 'delete') {
+      if (entityType == null || entityId == null) {
+        console.warn('[SyncManager] Skipping delete op with missing entityType/entityId');
+        return true; // treat as no-op so we remove from queue
+      }
       const key = `${entityType}:${entityId}`;
       await redis.del(key);
+      return true;
+    }
+
+    if (data == null || entityType == null || entityId == null) {
+      console.warn('[SyncManager] Skipping update op with missing entityType, entityId, or data');
       return true;
     }
 
@@ -185,6 +194,14 @@ const processSyncQueue = async (): Promise<number> => {
   const failed: SyncOperation[] = [];
 
   for (const operation of queue) {
+    const { entityType, entityId, type, data } = operation;
+    const valid = type === 'delete'
+      ? entityType != null && entityId != null
+      : entityType != null && entityId != null && data != null;
+    if (!valid) {
+      await syncQueue.remove(operation.id);
+      continue;
+    }
     const success = await syncEntityToRedis(operation);
     
     if (success) {
@@ -321,6 +338,14 @@ export const queueOperation = async (
   entityId: string,
   data?: any
 ): Promise<void> => {
+  if (entityType == null || entityId == null) {
+    console.warn('[SyncManager] queueOperation skipped: missing entityType or entityId');
+    return;
+  }
+  if (type !== 'delete' && data == null) {
+    console.warn('[SyncManager] queueOperation skipped: update/create requires data');
+    return;
+  }
   await syncQueue.add({
     type,
     entityType,
