@@ -101,6 +101,11 @@ export interface CustomerCampaignProgress {
   startDate?: string;
   endDate?: string;
   qrCode?: string;
+  /** Products/actions to collect (from campaign definition). */
+  selectedProducts?: string[];
+  selectedActions?: string[];
+  /** Products/actions customer has scanned — earned out of total. */
+  collectedItems?: { itemType: string; itemName: string }[];
 }
 
 // ============================================

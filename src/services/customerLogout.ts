@@ -43,6 +43,9 @@ function toCampaignItem(c: CustomerCampaignProgress): Record<string, unknown> {
     startDate: c.startDate,
     endDate: c.endDate,
     qrCode: c.qrCode,
+    selectedProducts: Array.isArray(c.selectedProducts) ? c.selectedProducts : undefined,
+    selectedActions: Array.isArray(c.selectedActions) ? c.selectedActions : undefined,
+    collectedItems: Array.isArray(c.collectedItems) ? c.collectedItems : undefined,
   };
 }
 

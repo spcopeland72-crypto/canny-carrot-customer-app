@@ -38,6 +38,9 @@ export function recordToFlatRewards(record: CustomerRecord): CustomerReward[] {
       startDate: c.startDate,
       endDate: c.endDate,
       isEarned: c.status === 'earned' || c.status === 'redeemed',
+      selectedProducts: c.selectedProducts,
+      selectedActions: c.selectedActions,
+      collectedItems: c.collectedItems,
     });
   }
   return out;
@@ -77,6 +80,9 @@ export function flatRewardsToRecord(record: CustomerRecord, flat: CustomerReward
         startDate: r.startDate,
         endDate: r.endDate,
         qrCode: r.qrCode,
+        selectedProducts: Array.isArray(r.selectedProducts) ? r.selectedProducts : undefined,
+        selectedActions: Array.isArray(r.selectedActions) ? r.selectedActions : undefined,
+        collectedItems: Array.isArray(r.collectedItems) ? r.collectedItems : undefined,
       };
       if (earned) earnedCampaigns.push(c);
       else activeCampaigns.push(c);

@@ -20,7 +20,7 @@ import { createEmptyCustomerRecord } from '../types/customer';
 const CUSTOMER_RECORD_KEY = 'customerRecord';
 
 /**
- * Get the current customer's record
+ * Get the current customer's record. Creates empty if none exists (normal app use).
  */
 export const getCustomerRecord = async (): Promise<CustomerRecord> => {
   const customerId = await getDeviceId();
@@ -37,13 +37,28 @@ export const getCustomerRecord = async (): Promise<CustomerRecord> => {
 };
 
 /**
+ * Get customer record for sync only. Does NOT create if missing.
+ * Use in logout/sync so we never persist an empty record during teardown.
+ */
+export const getCustomerRecordForSync = async (): Promise<CustomerRecord | null> => {
+  const record = await storage.get<CustomerRecord>(CUSTOMER_RECORD_KEY);
+  return record ?? null;
+};
+
+/**
  * Save the customer record locally and queue for sync.
  * Use only for profile updates, redeem, or other actions that trigger sync (click, select, sync, logout).
+ * When preserveUpdatedAt is true (e.g. after hydrating from API), do not change updatedAt — immutable rule: only create/edit bumps timestamp.
  */
-export const saveCustomerRecord = async (record: CustomerRecord): Promise<void> => {
-  record.updatedAt = new Date().toISOString();
+export const saveCustomerRecord = async (
+  record: CustomerRecord,
+  options?: { preserveUpdatedAt?: boolean }
+): Promise<void> => {
+  if (!options?.preserveUpdatedAt) {
+    record.updatedAt = new Date().toISOString();
+  }
   await storage.set(CUSTOMER_RECORD_KEY, record);
-  
+
   const customerId = record.profile?.id;
   if (customerId) {
     await queueOperation('update', 'customer', customerId, record);
@@ -58,6 +73,90 @@ export const saveCustomerRecord = async (record: CustomerRecord): Promise<void> 
 export const saveCustomerRecordLocalOnly = async (record: CustomerRecord): Promise<void> => {
   record.updatedAt = new Date().toISOString();
   await storage.set(CUSTOMER_RECORD_KEY, record);
+};
+
+/**
+ * Hydrate customer record reward/campaign arrays from API response (e.g. after login).
+ * Sync on logout sends this shape; so after login we repopulate local customerRecord
+ * so the next logout does not overwrite Redis with empty rewards.
+ * Preserves apiRecord.updatedAt so local timestamp stays same as Redis — no change means no overwrite on next logout.
+ */
+export const hydrateCustomerRecordFromApi = (
+  record: CustomerRecord,
+  apiRecord: {
+    rewards?: unknown[];
+    totalStamps?: number;
+    totalRedemptions?: number;
+    updatedAt?: string;
+  }
+): void => {
+  const now = new Date().toISOString();
+  const rewards = Array.isArray(apiRecord.rewards) ? apiRecord.rewards : [];
+  record.activeRewards = [];
+  record.earnedRewards = [];
+  record.redeemedRewards = [];
+  record.activeCampaigns = [];
+  record.earnedCampaigns = [];
+  record.redeemedCampaigns = [];
+
+  for (const r of rewards) {
+    const item = r as Record<string, unknown>;
+    const id = (item?.id ?? '').toString();
+    const pointsEarned = typeof item?.pointsEarned === 'number' ? item.pointsEarned : (typeof item?.count === 'number' ? item.count : 0);
+    const pointsRequired = typeof item?.requirement === 'number' ? item.requirement : (typeof item?.total === 'number' ? item.total : 1);
+    const status: RewardProgressStatus = pointsEarned >= pointsRequired ? 'earned' : 'active';
+    const businessId = (item?.businessId ?? 'default') as string;
+    const businessName = item?.businessName as string | undefined;
+
+    if (id.startsWith('campaign-')) {
+      const campaignId = id.replace(/^campaign-/, '');
+      const c: CustomerCampaignProgress = {
+        campaignId,
+        businessId,
+        businessName,
+        campaignName: (item?.name ?? 'Campaign').toString(),
+        pointsEarned,
+        pointsRequired,
+        status,
+        firstScanAt: now,
+        lastScanAt: now,
+        scanHistory: [],
+        startDate: item?.startDate as string | undefined,
+        endDate: item?.endDate as string | undefined,
+        qrCode: item?.qrCode as string | undefined,
+        selectedProducts: Array.isArray(item?.selectedProducts) ? (item.selectedProducts as string[]) : undefined,
+        selectedActions: Array.isArray(item?.selectedActions) ? (item.selectedActions as string[]) : undefined,
+        collectedItems: Array.isArray(item?.collectedItems) ? (item.collectedItems as { itemType: string; itemName: string }[]) : undefined,
+      };
+      if (status === 'earned') record.earnedCampaigns.push(c);
+      else record.activeCampaigns.push(c);
+    } else {
+      const prog: CustomerRewardProgress = {
+        rewardId: id,
+        businessId,
+        businessName,
+        rewardName: (item?.name ?? 'Reward').toString(),
+        pointsEarned,
+        pointsRequired,
+        status,
+        firstScanAt: now,
+        lastScanAt: now,
+        scanHistory: [],
+        rewardType: (item?.rewardType as 'free_product' | 'discount' | 'other') ?? 'other',
+        qrCode: item?.qrCode as string | undefined,
+      };
+      if (status === 'earned') record.earnedRewards.push(prog);
+      else record.activeRewards.push(prog);
+    }
+  }
+
+  if (typeof apiRecord.totalStamps === 'number') record.stats.totalScans = apiRecord.totalStamps;
+  if (typeof apiRecord.totalRedemptions === 'number') {
+    record.stats.totalRewardsRedeemed = apiRecord.totalRedemptions;
+    record.stats.totalCampaignsRedeemed = 0;
+  }
+  // Preserve server timestamp — immutable rule: only create/edit changes updatedAt; hydrate is not an edit
+  record.updatedAt = apiRecord.updatedAt ?? record.updatedAt ?? now;
 };
 
 /**
