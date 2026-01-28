@@ -696,7 +696,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           existingReward.pinCode = parsedReward.pinCode;
         }
         if (businessId !== 'default') existingReward.businessId = businessId;
-        if (businessName != null) existingReward.businessName = businessName;
+        existingReward.businessName = businessName ?? undefined;
         if (parsedReward.products && parsedReward.products.length > 0) {
           existingReward.selectedProducts = parsedReward.products;
         }
@@ -749,7 +749,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           pointsEarned: rewardProgress.pointsEarned,
           pinCode: parsedReward.pinCode,
           businessId: businessId !== 'default' ? businessId : undefined,
-          businessName: businessName || undefined,
+          businessName: businessName ?? undefined,
           isEarned: rewardProgress.pointsEarned >= totalPointsRequired,
           createdAt: new Date().toISOString(), // Add timestamp so it appears in carousel
           lastScannedAt: new Date().toISOString(), // Track last scan time
@@ -777,7 +777,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
           found.isEarned = rewardProgress.pointsEarned >= (requirement * pointsPerPurchase);
           if (parsedReward.pinCode && !found.pinCode) found.pinCode = parsedReward.pinCode;
           if (businessId !== 'default') found.businessId = businessId;
-          if (businessName != null) found.businessName = businessName;
+          found.businessName = businessName ?? undefined;
           if (parsedReward.products && parsedReward.products.length > 0) found.selectedProducts = parsedReward.products;
           const updatedRewards = recheck.map(r => r.id === found.id ? found : r);
           await saveRewards(updatedRewards);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
+import {Alert} from 'react-native';
 import {performCustomerFullSync} from '../services/customerLogout';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {clearCustomerId, storage} from '../services/localStorage';
 
 interface AccountModalProps {
   visible: boolean;
@@ -28,35 +30,51 @@ const AccountModal: React.FC<AccountModalProps> = ({
   customerName = 'Customer',
   customerEmail = '',
 }) => {
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      const syncResult = await performCustomerFullSync();
+      if (syncResult.success) {
+        Alert.alert('Sync', 'Your data has been synced.');
+      } else {
+        Alert.alert('Sync', (syncResult.errors || []).join('\n') || 'Sync failed.');
+      }
+    } catch (e) {
+      Alert.alert('Sync', e instanceof Error ? e.message : 'Sync failed.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       onClose();
       console.log('🔄 [CUSTOMER LOGOUT] Starting logout with full sync...');
-      
-      // Perform full replacement sync
+
       const syncResult = await performCustomerFullSync();
-      
       if (syncResult.success) {
         console.log('✅ [CUSTOMER LOGOUT] Full replacement sync completed successfully');
       } else {
         console.warn('⚠️ [CUSTOMER LOGOUT] Some data failed to sync:', syncResult.errors);
-        // Continue with logout even if sync fails
       }
-      
-      // Clear local storage (customer record will be recreated on next login)
-      await AsyncStorage.removeItem('customerRecord');
+
+      await clearCustomerId();
+      await storage.delete('customerRecord');
       console.log('✅ [CUSTOMER LOGOUT] Logged out successfully');
-      
-      // Call parent logout handler
-      if (onLogout) {
-        onLogout();
-      }
+
+      if (onLogout) onLogout();
     } catch (error) {
       console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
     }
   };
 
   const handleMenuAction = (action: string) => {
+    if (action === 'sync') {
+      handleSync();
+      return;
+    }
     onClose();
     if (action === 'logout') {
       handleLogout();
@@ -99,6 +117,19 @@ const AccountModal: React.FC<AccountModalProps> = ({
               style={styles.menuItem}
               onPress={() => handleMenuAction('Account')}>
               <Text style={styles.menuItemText}>View Account</Text>
+              <Text style={styles.menuItemIcon}>→</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleMenuAction('sync')}
+              disabled={syncing}>
+              <View style={styles.menuItemLeft}>
+                {syncing && (
+                  <ActivityIndicator size="small" color={Colors.primary} style={styles.syncSpinner} />
+                )}
+                <Text style={styles.menuItemText}>{syncing ? 'Syncing…' : 'Sync'}</Text>
+              </View>
               <Text style={styles.menuItemIcon}>→</Text>
             </TouchableOpacity>
 
@@ -164,6 +195,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[100],
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncSpinner: {
+    marginRight: 8,
   },
   menuItemText: {
     fontSize: 16,

@@ -1,17 +1,97 @@
 /**
- * Customer Logout Service
- * 
- * Performs full replacement sync of customer data to Redis on logout
+ * Customer Logout / Sync Service
+ *
+ * Syncs customer data to Redis via PUT /customers/:id/sync.
+ * Uses customer **UUID** (not email or device id). Resolve by email if UUID unknown.
+ * One-blob design: only customer record is synced; no reward/campaign progress updates.
  */
 
 import { getCustomerRecord } from './customerRecord';
-import { getDeviceId } from './localStorage';
-import type { CustomerRecord } from '../types/customer';
+import { getCustomerId, setCustomerId } from './localStorage';
+import { getByEmail, sync as apiSync } from './customerApi';
+import type {
+  CustomerRecord,
+  CustomerRewardProgress,
+  CustomerCampaignProgress,
+} from '../types/customer';
 
-const API_BASE_URL = 'https://api.cannycarrot.com';
+function toRewardItem(r: CustomerRewardProgress): Record<string, unknown> {
+  return {
+    id: r.rewardId,
+    name: r.rewardName,
+    count: r.pointsEarned,
+    total: r.pointsRequired,
+    pointsEarned: r.pointsEarned,
+    requirement: r.pointsRequired,
+    businessId: r.businessId,
+    businessName: r.businessName,
+    rewardType: r.rewardType,
+    qrCode: r.qrCode,
+  };
+}
+
+function toCampaignItem(c: CustomerCampaignProgress): Record<string, unknown> {
+  return {
+    id: `campaign-${c.campaignId}`,
+    name: c.campaignName,
+    count: c.pointsEarned,
+    total: c.pointsRequired,
+    pointsEarned: c.pointsEarned,
+    requirement: c.pointsRequired,
+    businessId: c.businessId,
+    businessName: c.businessName,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    qrCode: c.qrCode,
+  };
+}
 
 /**
- * Perform full replacement sync - makes Redis identical to local customer record
+ * Build sync body { ...account, rewards } from CustomerRecord.
+ * Uses customer UUID as id; account from profile; rewards = flattened active+earned+redeemed.
+ */
+function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<string, unknown> {
+  const profile = record.profile;
+  const name = (profile.name ?? '').trim();
+  const parts = name ? name.split(/\s+/) : [];
+  const firstName = parts[0] ?? 'Customer';
+  const lastName = parts.slice(1).join(' ') || '';
+
+  const rewards: Record<string, unknown>[] = [];
+  for (const r of [
+    ...record.activeRewards,
+    ...record.earnedRewards,
+    ...record.redeemedRewards,
+  ]) {
+    rewards.push(toRewardItem(r));
+  }
+  for (const c of [
+    ...record.activeCampaigns,
+    ...record.earnedCampaigns,
+    ...record.redeemedCampaigns,
+  ]) {
+    rewards.push(toCampaignItem(c));
+  }
+
+  return {
+    id: customerUuid,
+    email: (profile.email ?? '').trim().toLowerCase() || undefined,
+    firstName,
+    lastName,
+    phone: profile.phone ?? undefined,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    preferences: profile.preferences,
+    totalStamps: record.stats.totalScans,
+    totalRedemptions:
+      record.stats.totalRewardsRedeemed + record.stats.totalCampaignsRedeemed,
+    rewards,
+  };
+}
+
+/**
+ * Perform sync — PUT /customers/:id/sync with local customer record.
+ * Uses stored customer UUID; if missing, resolves by profile.email via by-email, then stores UUID.
  */
 export const performCustomerFullSync = async (): Promise<{
   success: boolean;
@@ -20,159 +100,42 @@ export const performCustomerFullSync = async (): Promise<{
   const errors: string[] = [];
 
   try {
-    console.log('🔄 [CUSTOMER LOGOUT] Starting full replacement sync...');
-    console.log('🔄 [CUSTOMER LOGOUT] This will replace all customer data in Redis with local data');
-
-    // Get customer record from local storage
-    const customerRecord = await getCustomerRecord();
-    const customerId = await getDeviceId();
-
-    if (!customerRecord || !customerId) {
-      throw new Error('No customer record or customer ID found');
+    const record = await getCustomerRecord();
+    if (!record) {
+      throw new Error('No customer record found');
     }
 
-    // Write entire customer record to Redis
-    console.log(`📤 [CUSTOMER LOGOUT] Writing customer record to Redis (${customerId})...`);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/customers/${customerId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(customerRecord),
-      });
+    let customerUuid = await getCustomerId();
 
-      if (response.ok) {
-        console.log('✅ [CUSTOMER LOGOUT] Customer record written to Redis');
-      } else {
-        const errorText = await response.text();
-        console.error(`❌ [CUSTOMER LOGOUT] Failed to write customer record: ${response.status} ${errorText.substring(0, 200)}`);
-        errors.push('Failed to sync customer record');
-      }
-    } catch (error: any) {
-      console.error('❌ [CUSTOMER LOGOUT] Error writing customer record:', error.message || error);
-      errors.push('Failed to sync customer record');
-    }
-
-    // Update business records with customer progress
-    // For each reward/campaign the customer has progress on, update the business's reward/campaign record
-    const allRewards = [
-      ...customerRecord.activeRewards,
-      ...customerRecord.earnedRewards,
-      ...customerRecord.redeemedRewards,
-    ];
-
-    const allCampaigns = [
-      ...customerRecord.activeCampaigns,
-      ...customerRecord.earnedCampaigns,
-      ...customerRecord.redeemedCampaigns,
-    ];
-
-    // Update reward progress in business records
-    for (const rewardProgress of allRewards) {
-      if (rewardProgress.businessId) {
-        try {
-          // Update the reward's customerProgress field in Redis
-          const rewardResponse = await fetch(`${API_BASE_URL}/api/v1/rewards/${rewardProgress.rewardId}`, {
-            method: 'GET',
-          });
-
-          if (rewardResponse.ok) {
-            const rewardData = await rewardResponse.json();
-            if (rewardData.success && rewardData.data) {
-              const reward = rewardData.data;
-              
-              // Update customerProgress
-              const updatedReward = {
-                ...reward,
-                customerProgress: {
-                  ...(reward.customerProgress || {}),
-                  [customerId]: rewardProgress.pointsEarned || 0,
-                },
-              };
-
-              // Write updated reward back
-              const updateResponse = await fetch(`${API_BASE_URL}/api/v1/rewards/${rewardProgress.rewardId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedReward),
-              });
-
-              if (updateResponse.ok) {
-                console.log(`  ✅ Updated reward ${rewardProgress.rewardId} with customer progress`);
-              } else {
-                console.warn(`  ⚠️ Failed to update reward ${rewardProgress.rewardId}`);
-              }
-            }
-          }
-        } catch (error: any) {
-          console.error(`  ❌ Error updating reward ${rewardProgress.rewardId}:`, error.message || error);
-        }
+    if (!customerUuid && record.profile?.email) {
+      const resolved = await getByEmail(record.profile.email);
+      if (resolved?.id) {
+        customerUuid = resolved.id;
+        await setCustomerId(customerUuid);
       }
     }
 
-    // Update campaign progress in business records
-    for (const campaignProgress of allCampaigns) {
-      if (campaignProgress.businessId) {
-        try {
-          // Update the campaign's customerProgress field in Redis
-          const campaignResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns/${campaignProgress.campaignId}`, {
-            method: 'GET',
-          });
-
-          if (campaignResponse.ok) {
-            const campaignData = await campaignResponse.json();
-            if (campaignData.success && campaignData.data) {
-              const campaign = campaignData.data;
-              
-              // Update customerProgress
-              const updatedCampaign = {
-                ...campaign,
-                customerProgress: {
-                  ...(campaign.customerProgress || {}),
-                  [customerId]: campaignProgress.pointsEarned || 0,
-                },
-              };
-
-              // Write updated campaign back
-              const updateResponse = await fetch(`${API_BASE_URL}/api/v1/campaigns/${campaignProgress.campaignId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedCampaign),
-              });
-
-              if (updateResponse.ok) {
-                console.log(`  ✅ Updated campaign ${campaignProgress.campaignId} with customer progress`);
-              } else {
-                console.warn(`  ⚠️ Failed to update campaign ${campaignProgress.campaignId}`);
-              }
-            }
-          }
-        } catch (error: any) {
-          console.error(`  ❌ Error updating campaign ${campaignProgress.campaignId}:`, error.message || error);
-        }
-      }
+    if (!customerUuid) {
+      throw new Error(
+        'No customer UUID. Sign in with email or complete sync first.'
+      );
     }
 
-    console.log('\n✅ [CUSTOMER LOGOUT] Full replacement sync completed');
-    console.log(`   Customer record: ${errors.length === 0 ? '✅' : '❌'}`);
+    const body = buildSyncBody(record, customerUuid);
+    const result = await apiSync(customerUuid, body);
 
-    return {
-      success: errors.length === 0,
-      errors,
-    };
-  } catch (error: any) {
-    console.error('❌ [CUSTOMER LOGOUT] Full replacement sync error:', error);
-    errors.push(error.message || 'Unknown sync error');
-    return {
-      success: false,
-      errors,
-    };
+    if (result.success) {
+      console.log(`✅ [CUSTOMER SYNC] Customer record synced (${customerUuid})`);
+    } else {
+      errors.push(result.error ?? 'Failed to sync customer record');
+      console.error(`❌ [CUSTOMER SYNC] ${result.error}`);
+    }
+
+    return { success: errors.length === 0, errors };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Unknown sync error';
+    errors.push(msg);
+    console.error('❌ [CUSTOMER SYNC]', e);
+    return { success: false, errors };
   }
 };
-
-
-
-
-
-
-

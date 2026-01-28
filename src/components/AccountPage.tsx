@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
-import {getCustomerRecord} from '../services/customerRecord';
+import {getCustomerRecord, updateCustomerProfile} from '../services/customerRecord';
+import {getCustomerId, setCustomerId} from '../services/localStorage';
+import {getByEmail} from '../services/customerApi';
 
 interface AccountPageProps {
   currentScreen: string;
@@ -31,6 +34,19 @@ const AccountPage: React.FC<AccountPageProps> = ({
   const [customerEmail, setCustomerEmail] = useState('Loading...');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasCustomerId, setHasCustomerId] = useState<boolean | null>(null);
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+
+  const loadHasCustomerId = useCallback(async () => {
+    const id = await getCustomerId();
+    setHasCustomerId(!!id);
+  }, []);
+
+  useEffect(() => {
+    loadHasCustomerId();
+  }, [loadHasCustomerId]);
 
   // Load customer account details
   useEffect(() => {
@@ -60,9 +76,10 @@ const AccountPage: React.FC<AccountPageProps> = ({
         }
         
         if (record && record.profile) {
-          const fullName = record.profile.firstName && record.profile.lastName
-            ? `${record.profile.firstName} ${record.profile.lastName}`
-            : record.profile.firstName || record.profile.lastName || 'User';
+          const fullName = record.profile.name?.trim()
+            || (record.profile.firstName && record.profile.lastName
+              ? `${record.profile.firstName} ${record.profile.lastName}`
+              : (record.profile.firstName || record.profile.lastName || 'User'));
           setCustomerName(fullName);
           setCustomerEmail(record.profile.email || 'No email set');
         } else {
@@ -82,6 +99,40 @@ const AccountPage: React.FC<AccountPageProps> = ({
     
     loadAccountDetails();
   }, []);
+
+  const handleSignIn = async () => {
+    const email = (signInEmail || '').trim().toLowerCase();
+    if (!email) {
+      setSignInError('Enter your email');
+      return;
+    }
+    setSignInLoading(true);
+    setSignInError(null);
+    try {
+      const record = await getByEmail(email);
+      if (!record?.id) {
+        setSignInError('Account not found. Use the email we have on file.');
+        return;
+      }
+      await setCustomerId(record.id);
+      const name = [record.firstName, record.lastName].filter(Boolean).join(' ').trim();
+      if (name || record.email) {
+        await updateCustomerProfile({
+          name: name || undefined,
+          email: record.email ?? email,
+        });
+      }
+      setHasCustomerId(true);
+      setCustomerName(name || 'User');
+      setCustomerEmail(record.email ?? email);
+      setSignInEmail('');
+      Alert.alert('Signed in', `Welcome, ${name || email}`);
+    } catch (e) {
+      setSignInError(e instanceof Error ? e.message : 'Sign in failed');
+    } finally {
+      setSignInLoading(false);
+    }
+  };
 
   const handleBack = () => {
     if (onBack) {
@@ -108,6 +159,38 @@ const AccountPage: React.FC<AccountPageProps> = ({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        {/* Sign in with email (when no customer UUID) */}
+        {hasCustomerId === false && (
+          <View style={styles.signInSection}>
+            <Text style={styles.signInTitle}>Sign in with email</Text>
+            <Text style={styles.signInHint}>Use the email we have on file to sync your rewards.</Text>
+            <TextInput
+              style={styles.signInInput}
+              value={signInEmail}
+              onChangeText={(t) => { setSignInEmail(t); setSignInError(null); }}
+              placeholder="laverickclare@hotmail.com"
+              placeholderTextColor={Colors.text.secondary}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!signInLoading}
+            />
+            {signInError ? (
+              <Text style={styles.signInError}>{signInError}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.signInButton, signInLoading && styles.signInButtonDisabled]}
+              onPress={handleSignIn}
+              disabled={signInLoading}>
+              {signInLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.signInButtonText}>Sign in</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* User Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
@@ -471,6 +554,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF6B35',
     textAlign: 'center',
+  },
+  signInSection: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: Colors.neutral[100],
+    borderRadius: 12,
+  },
+  signInTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginBottom: 6,
+  },
+  signInHint: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    marginBottom: 12,
+  },
+  signInInput: {
+    fontSize: 16,
+    color: Colors.text.primary,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  signInError: {
+    fontSize: 13,
+    color: '#FF6B35',
+    marginBottom: 8,
+  },
+  signInButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  signInButtonDisabled: {
+    opacity: 0.7,
+  },
+  signInButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

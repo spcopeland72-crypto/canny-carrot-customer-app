@@ -12,6 +12,8 @@ const STORAGE_KEYS = {
   SYNC_QUEUE: 'canny_carrot:sync_queue',
   SYNC_STATUS: 'canny_carrot:sync_status',
   DEVICE_ID: 'canny_carrot:device_id',
+  /** Customer UUID from API (primary id). Do not use email/device as customer id. */
+  CUSTOMER_UUID: 'canny_carrot:customer_uuid',
 } as const;
 
 const DB_NAME = 'CannyCarrotCustomerDB';
@@ -39,6 +41,42 @@ export const getDeviceId = async (): Promise<string> => {
   } catch (error) {
     // Fallback if AsyncStorage fails
     return `device-native-${Date.now()}`;
+  }
+};
+
+/** Customer UUID from API. Primary id; used for sync / by-id. */
+export const getCustomerId = async (): Promise<string | null> => {
+  try {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(STORAGE_KEYS.CUSTOMER_UUID);
+    }
+    return await AsyncStorage.getItem(STORAGE_KEYS.CUSTOMER_UUID);
+  } catch {
+    return null;
+  }
+};
+
+export const setCustomerId = async (uuid: string): Promise<void> => {
+  try {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(STORAGE_KEYS.CUSTOMER_UUID, uuid);
+    } else {
+      await AsyncStorage.setItem(STORAGE_KEYS.CUSTOMER_UUID, uuid);
+    }
+  } catch (e) {
+    console.warn('setCustomerId failed:', e);
+  }
+};
+
+export const clearCustomerId = async (): Promise<void> => {
+  try {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOMER_UUID);
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEYS.CUSTOMER_UUID);
+    }
+  } catch (e) {
+    console.warn('clearCustomerId failed:', e);
   }
 };
 

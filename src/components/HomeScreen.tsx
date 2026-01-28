@@ -1106,8 +1106,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         onClose={() => setAccountModalVisible(false)}
         onNavigate={onNavigate}
         onLogout={() => {
-          // Navigate to login screen or reset app state
-          onNavigate('Login');
+          onNavigate('Welcome');
         }}
         customerName={userName}
         customerEmail=""
