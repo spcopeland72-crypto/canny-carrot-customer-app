@@ -28,7 +28,7 @@ import RedeemModal from './RedeemModal';
 import CongratulationsModal from './CongratulationsModal';
 import RewardQRCodeModal from './RewardQRCodeModal';
 import AccountModal from './AccountModal';
-import {redeemReward} from '../services/customerRecord';
+import {getCustomerRecord, redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
 import {indexInList} from '../utils/campaignStampUtils';
 
@@ -250,7 +250,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onLogout = () => {},
   rewards: propsRewards = [],
 }) => {
-  const [userName] = useState('Simon'); // This would come from user context
+  const [userName, setUserName] = useState('there');
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   
@@ -299,6 +299,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       startContinuousAnimation();
     }
   }, [tickerWidth]);
+
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const record = await getCustomerRecord();
+        const full = (record?.profile?.name ?? '').trim();
+        const first = full ? full.split(/\s+/)[0] : '';
+        setUserName(first || 'there');
+      } catch {
+        setUserName('there');
+      }
+    };
+    loadUserName();
+  }, []);
+
   // FindMoreRewardsModal removed - now navigating to FindMoreRewardsPage
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
