@@ -117,6 +117,17 @@ const MorePage: React.FC<MorePageProps> = ({
           <Text style={styles.helpTitle}>HELP AND SUPPORT</Text>
 
           <TouchableOpacity
+            style={[styles.helpItem, styles.eventLogItem]}
+            onPress={() => onNavigate('EventLog')}
+            accessibilityLabel="Event Log">
+            <View style={styles.helpIconContainer}>
+              <Text style={styles.helpIcon}>📋</Text>
+            </View>
+            <Text style={styles.helpText}>Event Log</Text>
+            <Text style={styles.helpArrow}>→</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.helpItem, styles.carrieItem]}
             onPress={() => onNavigate('Chat')}>
             <View style={[styles.helpIconContainer, styles.carrieIconContainer]}>
@@ -136,16 +147,6 @@ const MorePage: React.FC<MorePageProps> = ({
               <Text style={styles.helpIcon}>✉</Text>
             </View>
             <Text style={styles.helpText}>Contact Customer Care</Text>
-            <Text style={styles.helpArrow}>→</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.helpItem}
-            onPress={() => onNavigate('EventLog')}>
-            <View style={styles.helpIconContainer}>
-              <Text style={styles.helpIcon}>📋</Text>
-            </View>
-            <Text style={styles.helpText}>Event Log</Text>
             <Text style={styles.helpArrow}>→</Text>
           </TouchableOpacity>
 
@@ -416,6 +417,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[200],
+  },
+  eventLogItem: {
+    backgroundColor: Colors.primary + '12',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
   },
   carrieItem: {
     backgroundColor: Colors.secondary + '15',
