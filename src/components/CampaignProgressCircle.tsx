@@ -1,8 +1,8 @@
 /**
- * Campaign progress icon: segments around a grey circle, x/total in orange.
+ * Campaign progress icon: segments around a grey circle, x/total in centre.
  * - N segments (N = total), starting at 12 o'clock, clockwise.
  * - Earned segments red, remaining grey. Segments extend slightly beyond grey circle.
- * - Centre: "x/total" in large orange, almost filling the circle.
+ * - Centre: "x/total" in large black, almost filling the circle.
  */
 
 import React from 'react';
@@ -104,6 +104,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: '800',
-    color: Colors.secondary,
+    color: '#000000',
   },
 });

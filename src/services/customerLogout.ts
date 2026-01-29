@@ -27,6 +27,8 @@ function toRewardItem(r: CustomerRewardProgress): Record<string, unknown> {
     businessName: r.businessName,
     rewardType: r.rewardType,
     qrCode: r.qrCode,
+    selectedProducts: Array.isArray(r.selectedProducts) ? r.selectedProducts : undefined,
+    selectedActions: Array.isArray(r.selectedActions) ? r.selectedActions : undefined,
   };
 }
 

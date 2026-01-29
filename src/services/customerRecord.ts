@@ -144,6 +144,8 @@ export const hydrateCustomerRecordFromApi = (
         scanHistory: [],
         rewardType: (item?.rewardType as 'free_product' | 'discount' | 'other') ?? 'other',
         qrCode: item?.qrCode as string | undefined,
+        selectedProducts: Array.isArray(item?.selectedProducts) ? (item.selectedProducts as string[]) : undefined,
+        selectedActions: Array.isArray(item?.selectedActions) ? (item.selectedActions as string[]) : undefined,
       };
       if (status === 'earned') record.earnedRewards.push(prog);
       else record.activeRewards.push(prog);

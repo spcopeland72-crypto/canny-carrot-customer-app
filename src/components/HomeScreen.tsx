@@ -385,46 +385,63 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       })
     : [];
 
+  const buildRewardCard = (reward: {
+    id: string;
+    name: string;
+    count?: number;
+    total?: number;
+    icon?: string;
+    businessLogo?: string;
+    isEarned?: boolean;
+    pinCode?: string;
+    qrCode?: string;
+    businessId?: string;
+    businessName?: string;
+    selectedProducts?: string[];
+    selectedActions?: string[];
+    collectedItems?: { itemType: string; itemName: string }[];
+  }): RewardCard => {
+    const total = reward.total || 0;
+    const products = reward.selectedProducts || [];
+    const actions = reward.selectedActions || [];
+    const fromQr = [...products, ...actions].slice(0, total);
+    const circleLabels = total > 0 && fromQr.length >= total ? fromQr : undefined;
+    const collected = reward.collectedItems || [];
+    const stampedIndices: number[] = [];
+    for (const c of collected) {
+      if (c.itemType === 'product') {
+        const i = indexInList(products, c.itemName);
+        if (i >= 0) stampedIndices.push(i);
+      } else {
+        const i = indexInList(actions, c.itemName);
+        if (i >= 0) stampedIndices.push(products.length + i);
+      }
+    }
+    let businessId = reward.businessId;
+    if (!businessId && reward.id.startsWith('campaign-')) {
+      const parts = reward.id.slice(9).split('-');
+      if (parts.length >= 2) businessId = parts[0];
+    }
+    const businessName = (reward.businessName ?? '').trim() || undefined;
+    return {
+      id: reward.id,
+      title: reward.name,
+      count: reward.count ?? 0,
+      total: reward.total ?? 0,
+      icon: reward.icon || '🎁',
+      image: reward.businessLogo ? { uri: reward.businessLogo } : undefined,
+      isEarned: reward.isEarned || false,
+      pinCode: reward.pinCode,
+      qrCode: reward.qrCode,
+      businessName,
+      businessId: businessId || reward.businessId,
+      circleLabels,
+      stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
+    };
+  };
+
   const rewardCards: RewardCard[] = sortedRewards.length > 0
-    ? sortedRewards.map(reward => {
-        const total = reward.total || 0;
-        const products = reward.selectedProducts || [];
-        const actions = reward.selectedActions || [];
-        const fromQr = [...products, ...actions].slice(0, total);
-        const circleLabels = total > 0 && fromQr.length >= total ? fromQr : undefined;
-        const collected = reward.collectedItems || [];
-        const stampedIndices: number[] = [];
-        for (const c of collected) {
-          if (c.itemType === 'product') {
-            const i = indexInList(products, c.itemName);
-            if (i >= 0) stampedIndices.push(i);
-          } else {
-            const i = indexInList(actions, c.itemName);
-            if (i >= 0) stampedIndices.push(products.length + i);
-          }
-        }
-        let businessId = reward.businessId;
-        if (!businessId && reward.id.startsWith('campaign-')) {
-          const parts = reward.id.slice(9).split('-');
-          if (parts.length >= 2) businessId = parts[0];
-        }
-        const businessName = (reward.businessName ?? '').trim() || undefined;
-        return {
-          id: reward.id,
-          title: reward.name,
-          count: reward.count,
-          total: reward.total,
-          icon: reward.icon || '🎁',
-          image: reward.businessLogo ? { uri: reward.businessLogo } : undefined,
-          isEarned: reward.isEarned || false,
-          pinCode: reward.pinCode,
-          qrCode: reward.qrCode,
-          businessName,
-          businessId: businessId || reward.businessId,
-          circleLabels,
-          stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
-        };
-      })
+    ? sortedRewards.map((reward) => buildRewardCard(reward))
     : [];
 
   const goodieCards: GoodieCard[] = [
@@ -745,8 +762,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   setSelectedRewardForRedemption(card);
                   setRedeemModalVisible(true);
                 } else {
-                  setSelectedRewardForQR(card);
-                  setRewardQRModalVisible(true);
+                  (async () => {
+                    const fresh = await loadRewards();
+                    const r = fresh.find((x) => x.id === card.id);
+                    const modalCard = r ? buildRewardCard(r) : card;
+                    setSelectedRewardForQR(modalCard);
+                    setRewardQRModalVisible(true);
+                  })();
                 }
               };
               
@@ -1010,13 +1032,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           }, 100);
         }}
         onRewardEarned={(reward) => {
-          // Show congratulations modal when reward is earned
           console.log('Reward earned:', reward);
-          setSelectedRewardForRedemption({
-            id: reward.id,
-            title: reward.name,
-            pinCode: reward.pinCode,
-          });
+          setSelectedRewardForRedemption(buildRewardCard(reward));
           setCongratulationsContext('earned');
           setCongratulationsModalVisible(true);
         }}

@@ -167,7 +167,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
   const d = details;
   const displayName = d?.name || businessName;
 
-  const rewardCards: RewardCard[] = rewards.map((reward) => {
+  const buildRewardCard = (reward: CustomerReward): RewardCard => {
     const total = reward.total || 0;
     const products = reward.selectedProducts || [];
     const actions = reward.selectedActions || [];
@@ -204,15 +204,22 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
       circleLabels,
       stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
     };
-  });
+  };
+
+  const rewardCards: RewardCard[] = rewards.map((reward) => buildRewardCard(reward));
 
   const handleRewardPress = (card: RewardCard) => {
     if (card.isEarned) {
       setSelectedRewardForRedemption(card);
       setRedeemModalVisible(true);
     } else {
-      setSelectedRewardForQR(card);
-      setRewardQRModalVisible(true);
+      (async () => {
+        const fresh = await loadRewards();
+        const r = fresh.find((x) => x.id === card.id);
+        const modalCard = r ? buildRewardCard(r) : card;
+        setSelectedRewardForQR(modalCard);
+        setRewardQRModalVisible(true);
+      })();
     }
   };
 
@@ -625,6 +632,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.primary },
+  sectionTitleRewardsCampaigns: { color: '#000000' },
   sectionLink: {
     fontSize: 16,
     color: '#fff',

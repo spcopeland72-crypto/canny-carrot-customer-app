@@ -21,6 +21,8 @@ export function recordToFlatRewards(record: CustomerRecord): CustomerReward[] {
       businessName: r.businessName,
       qrCode: r.qrCode,
       isEarned: r.status === 'earned' || r.status === 'redeemed',
+      selectedProducts: r.selectedProducts,
+      selectedActions: r.selectedActions,
     });
   }
   for (const c of [...record.activeCampaigns, ...record.earnedCampaigns, ...record.redeemedCampaigns]) {
@@ -100,6 +102,8 @@ export function flatRewardsToRecord(record: CustomerRecord, flat: CustomerReward
         scanHistory: [],
         rewardType: (r.rewardType as 'free_product' | 'discount' | 'other') ?? 'other',
         qrCode: r.qrCode,
+        selectedProducts: Array.isArray(r.selectedProducts) ? r.selectedProducts : undefined,
+        selectedActions: Array.isArray(r.selectedActions) ? r.selectedActions : undefined,
       };
       if (earned) earnedRewards.push(prog);
       else activeRewards.push(prog);

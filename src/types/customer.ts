@@ -65,6 +65,9 @@ export interface CustomerRewardProgress {
   rewardType?: 'free_product' | 'discount' | 'other';
   rewardDescription?: string;
   qrCode?: string;
+  /** Products/actions from QR (stamp-card labels). Persisted in core store; used for circle labels and stamp pins. */
+  selectedProducts?: string[];
+  selectedActions?: string[];
 }
 
 /**
