@@ -222,7 +222,6 @@ interface HomeScreenProps {
   onScanPress?: () => void;
   onViewBusinessPage?: (businessName: string, businessId?: string) => void;
   onLogout?: () => void;
-  onSyncSuccess?: () => void | Promise<void>;
   rewards?: Array<{
     id: string;
     name: string;
@@ -1141,7 +1140,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         onClose={() => setAccountModalVisible(false)}
         onNavigate={onNavigate}
         onLogout={onLogout}
-        onSyncSuccess={onSyncSuccess}
         customerName={userName}
         customerEmail=""
       />

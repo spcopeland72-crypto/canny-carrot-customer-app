@@ -205,8 +205,6 @@ function App(): React.JSX.Element {
           email: apiRecord.email ?? auth.email,
           phone: apiRecord.phone,
         });
-        // Hydrate customerRecord reward/campaign arrays from API so logout sync does not overwrite Redis with empty data.
-        // Save with preserveUpdatedAt so we keep server timestamp — no edit means second logout won't overwrite Redis.
         const record = await getCustomerRecord();
         hydrateCustomerRecordFromApi(record, apiRecord);
         await saveCustomerRecord(record, { preserveUpdatedAt: true });
@@ -237,15 +235,6 @@ function App(): React.JSX.Element {
     setCurrentScreen('Home');
   };
 
-  const handleSyncSuccess = async () => {
-    try {
-      const loaded = await loadRewards();
-      setRewards(loaded ?? []);
-    } catch (e) {
-      console.error('[App] Refresh rewards after sync:', e);
-    }
-  };
-
   const renderScreen = () => {
     switch (currentScreen) {
       case 'Home':
@@ -256,7 +245,6 @@ function App(): React.JSX.Element {
             onScanPress={handleScanPress}
             onViewBusinessPage={handleViewBusinessPage}
             onLogout={handleLogout}
-            onSyncSuccess={handleSyncSuccess}
             rewards={rewards}
           />
         );
@@ -372,7 +360,6 @@ function App(): React.JSX.Element {
             onScanPress={handleScanPress}
             onViewBusinessPage={handleViewBusinessPage}
             onLogout={handleLogout}
-            onSyncSuccess={handleSyncSuccess}
             rewards={rewards}
           />
         );
@@ -706,7 +693,6 @@ function App(): React.JSX.Element {
         onScanPress={handleScanPress}
         onViewBusinessPage={handleViewBusinessPage}
         onLogout={handleLogout}
-        onSyncSuccess={handleSyncSuccess}
         rewards={rewards}
       />
     );

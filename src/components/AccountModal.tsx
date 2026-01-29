@@ -18,7 +18,6 @@ interface AccountModalProps {
   onClose: () => void;
   onNavigate: (screen: string) => void;
   onLogout?: () => void;
-  onSyncSuccess?: () => void | Promise<void>;
   customerName?: string;
   customerEmail?: string;
 }
@@ -28,20 +27,17 @@ const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   onNavigate,
   onLogout,
-  onSyncSuccess,
   customerName = 'Customer',
   customerEmail = '',
 }) => {
   const [syncing, setSyncing] = useState(false);
 
-  // Match business CompanyMenuModal: Sync only on Sync click, login, logout.
   const handleSync = async () => {
     try {
       onClose();
       setSyncing(true);
       const syncResult = await performCustomerFullSync();
       if (syncResult.success) {
-        await onSyncSuccess?.();
         Alert.alert('Sync', 'Your data has been synced.');
       } else {
         Alert.alert('Sync', (syncResult.errors || []).join('\n') || 'Sync failed.');
