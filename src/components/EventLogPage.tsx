@@ -4,16 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  TouchableOpacity,
-  ActivityIndicator,
-  Platform,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
 import {getCustomerRecord} from '../services/customerRecord';
-import type {TransactionLogEntry} from '../types/customer';
 
 interface EventLogPageProps {
   currentScreen: string;
@@ -28,29 +25,15 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
   onBack,
   onScanPress,
 }) => {
-  const [log, setLog] = useState<TransactionLogEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [log, setLog] = useState<{ timestamp: string; action: string; data: Record<string, unknown> }[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
-      try {
-        const record = await getCustomerRecord();
-        if (mounted) {
-          setLog(record.transactionLog ?? []);
-          setError(null);
-        }
-      } catch (e) {
-        if (mounted) {
-          setError(e instanceof Error ? e.message : 'Failed to load event log');
-          setLog([]);
-        }
-      } finally {
-        if (mounted) setLoading(false);
+    getCustomerRecord().then((record) => {
+      if (mounted && Array.isArray(record.transactionLog)) {
+        setLog(record.transactionLog);
       }
-    };
-    load();
+    });
     return () => { mounted = false; };
   }, []);
 
@@ -59,47 +42,37 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
     else onNavigate('More');
   };
 
-  // Verbatim: one JSON line per entry (raw, as stored)
-  const verbatimLines = log == null
-    ? []
-    : log.map((entry) => JSON.stringify(entry));
-
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#E0E0E0" />
-      <View style={styles.headerBanner}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+
+      <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backArrow}>←</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Log</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.backButton} />
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading event log...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={true}>
-          {verbatimLines.length === 0 ? (
-            <Text style={styles.emptyText}>No events recorded yet.</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+
+        <View style={styles.menuList}>
+          {log.length === 0 ? (
+            <View style={styles.menuItem}>
+              <Text style={styles.menuItemTitle}>No events yet.</Text>
+            </View>
           ) : (
-            verbatimLines.map((line, i) => (
-              <Text key={i} style={styles.logLine} selectable>
-                {line}
-              </Text>
+            log.map((entry, index) => (
+              <View key={index} style={styles.menuItem}>
+                <Text style={styles.menuItemTitle}>{JSON.stringify(entry)}</Text>
+              </View>
             ))
           )}
-        </ScrollView>
-      )}
+        </View>
+      </ScrollView>
 
       <BottomNavigation
         currentScreen={currentScreen}
@@ -115,10 +88,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  headerBanner: {
-    backgroundColor: '#E0E0E0',
+  header: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -127,56 +100,42 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  backArrow: {
-    fontSize: 24,
-    color: Colors.text.primary,
-    fontWeight: 'bold',
+  backButtonText: {
+    fontSize: 28,
+    color: Colors.background,
+    fontWeight: '300',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: Colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: Colors.text.secondary,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#c62828',
-    textAlign: 'center',
+    color: Colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
     paddingBottom: 100,
   },
-  emptyText: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-    fontStyle: 'italic',
+  menuList: {
+    backgroundColor: Colors.background,
   },
-  logLine: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+    minHeight: 72,
+  },
+  menuItemTitle: {
+    fontSize: 16,
     color: Colors.text.primary,
-    marginBottom: 8,
+    fontWeight: '400',
+    flex: 1,
   },
 });
 
