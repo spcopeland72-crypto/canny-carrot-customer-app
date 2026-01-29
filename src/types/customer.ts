@@ -112,6 +112,31 @@ export interface CustomerCampaignProgress {
 }
 
 // ============================================
+// TRANSACTION LOG (date:time:ACTION + data)
+// ============================================
+
+export type TransactionAction = 'SCAN' | 'EDIT' | 'ACTION';
+
+/** One log entry: date:time:ACTION with structured data. */
+export interface TransactionLogEntry {
+  timestamp: string; // ISO
+  action: TransactionAction;
+  /** SCAN: what was scanned (reward/campaign/campaign_item). EDIT: what was changed. ACTION: what action (e.g. redeem). */
+  data: Record<string, unknown>;
+}
+
+const TRANSACTION_LOG_MAX = 300;
+
+/** Append entry and keep last N. Mutates record.transactionLog. */
+export function appendTransactionLog(record: CustomerRecord, entry: TransactionLogEntry): void {
+  if (!record.transactionLog) record.transactionLog = [];
+  record.transactionLog.push(entry);
+  if (record.transactionLog.length > TRANSACTION_LOG_MAX) {
+    record.transactionLog = record.transactionLog.slice(-TRANSACTION_LOG_MAX);
+  }
+}
+
+// ============================================
 // COMPLETE CUSTOMER RECORD
 // ============================================
 
@@ -150,6 +175,9 @@ export interface CustomerRecord {
     totalCampaignsRedeemed: number;
     businessesVisited: string[];  // List of business IDs
   };
+
+  /** Log of transactions: SCAN (what was scanned), EDIT (what was changed), ACTION (e.g. redeem). Capped at 300. */
+  transactionLog?: TransactionLogEntry[];
   
   // Metadata
   createdAt: string;
@@ -185,6 +213,7 @@ export const createEmptyCustomerRecord = (customerId: string): CustomerRecord =>
       totalCampaignsRedeemed: 0,
       businessesVisited: [],
     },
+    transactionLog: [],
     createdAt: now,
     updatedAt: now,
   };

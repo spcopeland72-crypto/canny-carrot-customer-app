@@ -18,6 +18,7 @@ interface AccountModalProps {
   onClose: () => void;
   onNavigate: (screen: string) => void;
   onLogout?: () => void;
+  onSyncSuccess?: () => void | Promise<void>;
   customerName?: string;
   customerEmail?: string;
 }
@@ -27,6 +28,7 @@ const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   onNavigate,
   onLogout,
+  onSyncSuccess,
   customerName = 'Customer',
   customerEmail = '',
 }) => {
@@ -39,6 +41,7 @@ const AccountModal: React.FC<AccountModalProps> = ({
       setSyncing(true);
       const syncResult = await performCustomerFullSync();
       if (syncResult.success) {
+        await onSyncSuccess?.();
         Alert.alert('Sync', 'Your data has been synced.');
       } else {
         Alert.alert('Sync', (syncResult.errors || []).join('\n') || 'Sync failed.');
@@ -52,16 +55,19 @@ const AccountModal: React.FC<AccountModalProps> = ({
 
   const handleLogout = async () => {
     try {
-      await logoutCustomer();
+      const result = await logoutCustomer();
       onClose();
-      if (onLogout) {
+      if (result.didLogout && onLogout) {
         onLogout();
+      } else if (!result.didLogout && result.error) {
+        Alert.alert(
+          'Logout deferred',
+          'Sync failed. Local data was kept. Try Sync first, then Logout again, or check your connection.'
+        );
       }
     } catch (error) {
       console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
-      if (onLogout) {
-        onLogout();
-      }
+      Alert.alert('Logout error', (error as Error)?.message ?? 'Could not log out.');
     }
   };
 

@@ -78,6 +78,8 @@ function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<str
     rewards.push(toCampaignItem(c));
   }
 
+  const transactionLog = (record.transactionLog ?? []).slice(-300);
+
   return {
     id: customerUuid,
     email: (profile.email ?? '').trim().toLowerCase() || undefined,
@@ -91,6 +93,7 @@ function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<str
     totalRedemptions:
       record.stats.totalRewardsRedeemed + record.stats.totalCampaignsRedeemed,
     rewards,
+    transactionLog: transactionLog.length > 0 ? transactionLog : undefined,
   };
 }
 

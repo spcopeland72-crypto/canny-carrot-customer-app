@@ -84,6 +84,7 @@ function App(): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
   const [viewingBusiness, setViewingBusiness] = useState<{ businessName: string; businessId?: string } | null>(null);
   const [isAuthenticatedState, setIsAuthenticatedState] = useState<boolean | null>(null);
+  const [dataRefreshKey, setDataRefreshKey] = useState(0);
 
   // Auth check on mount — same as business: always show login screen to start
   useEffect(() => {
@@ -158,9 +159,8 @@ function App(): React.JSX.Element {
       console.warn('[App] Available reward IDs:', updatedRewards.map(r => r.id));
     }
     setRewards(updatedRewards);
-    // Force a re-render by navigating away and back (if already on Home)
+    setDataRefreshKey((k) => k + 1);
     if (currentScreen === 'Home') {
-      // Small delay to ensure state update propagates
       setTimeout(() => {
         console.log('[App] Forcing Home screen refresh after reward scan');
       }, 200);
@@ -237,6 +237,15 @@ function App(): React.JSX.Element {
     setCurrentScreen('Home');
   };
 
+  const handleSyncSuccess = async () => {
+    try {
+      const loaded = await loadRewards();
+      setRewards(loaded ?? []);
+    } catch (e) {
+      console.error('[App] Refresh rewards after sync:', e);
+    }
+  };
+
   const renderScreen = () => {
     switch (currentScreen) {
       case 'Home':
@@ -247,6 +256,7 @@ function App(): React.JSX.Element {
             onScanPress={handleScanPress}
             onViewBusinessPage={handleViewBusinessPage}
             onLogout={handleLogout}
+            onSyncSuccess={handleSyncSuccess}
             rewards={rewards}
           />
         );
@@ -362,6 +372,7 @@ function App(): React.JSX.Element {
             onScanPress={handleScanPress}
             onViewBusinessPage={handleViewBusinessPage}
             onLogout={handleLogout}
+            onSyncSuccess={handleSyncSuccess}
             rewards={rewards}
           />
         );
@@ -405,6 +416,7 @@ function App(): React.JSX.Element {
             onNavigate={handleNavigate}
             onBack={handleBack}
             onScanPress={handleScanPress}
+            refreshTrigger={dataRefreshKey}
           />
         );
       case 'TermsConditions':
@@ -694,6 +706,7 @@ function App(): React.JSX.Element {
         onScanPress={handleScanPress}
         onViewBusinessPage={handleViewBusinessPage}
         onLogout={handleLogout}
+        onSyncSuccess={handleSyncSuccess}
         rewards={rewards}
       />
     );

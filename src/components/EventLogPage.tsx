@@ -17,6 +17,7 @@ interface EventLogPageProps {
   onNavigate: (screen: string) => void;
   onBack?: () => void;
   onScanPress?: () => void;
+  refreshTrigger?: number;
 }
 
 const EventLogPage: React.FC<EventLogPageProps> = ({
@@ -24,10 +25,13 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
   onNavigate,
   onBack,
   onScanPress,
+  refreshTrigger = 0,
 }) => {
   const [log, setLog] = useState<{ timestamp: string; action: string; data: Record<string, unknown> }[]>([]);
 
+  // Refresh when screen is shown or when new log entry is written (scan/sync)
   useEffect(() => {
+    if (currentScreen !== 'EventLog') return;
     let mounted = true;
     getCustomerRecord().then((record) => {
       if (mounted && Array.isArray(record.transactionLog)) {
@@ -35,7 +39,7 @@ const EventLogPage: React.FC<EventLogPageProps> = ({
       }
     });
     return () => { mounted = false; };
-  }, []);
+  }, [currentScreen, refreshTrigger]);
 
   const handleBack = () => {
     if (onBack) onBack();

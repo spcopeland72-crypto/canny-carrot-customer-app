@@ -15,7 +15,7 @@ import type {
   CustomerProfile,
   RewardProgressStatus,
 } from '../types/customer';
-import { createEmptyCustomerRecord } from '../types/customer';
+import { createEmptyCustomerRecord, appendTransactionLog } from '../types/customer';
 
 const CUSTOMER_RECORD_KEY = 'customerRecord';
 
@@ -88,6 +88,7 @@ export const hydrateCustomerRecordFromApi = (
     totalStamps?: number;
     totalRedemptions?: number;
     updatedAt?: string;
+    transactionLog?: { timestamp: string; action: string; data: Record<string, unknown> }[];
   }
 ): void => {
   const now = new Date().toISOString();
@@ -157,6 +158,9 @@ export const hydrateCustomerRecordFromApi = (
     record.stats.totalRewardsRedeemed = apiRecord.totalRedemptions;
     record.stats.totalCampaignsRedeemed = 0;
   }
+  if (Array.isArray(apiRecord.transactionLog)) {
+    record.transactionLog = apiRecord.transactionLog.slice(-TRANSACTION_LOG_MAX_HYDRATE);
+  }
   // Preserve server timestamp — immutable rule: only create/edit changes updatedAt; hydrate is not an edit
   record.updatedAt = apiRecord.updatedAt ?? record.updatedAt ?? now;
 };
@@ -168,11 +172,17 @@ export const updateCustomerProfile = async (
   updates: Partial<CustomerProfile>
 ): Promise<CustomerRecord> => {
   const record = await getCustomerRecord();
+  const fields = Object.keys(updates) as (keyof CustomerProfile)[];
   record.profile = {
     ...record.profile,
     ...updates,
     updatedAt: new Date().toISOString(),
   };
+  appendTransactionLog(record, {
+    timestamp: record.profile.updatedAt,
+    action: 'EDIT',
+    data: { fields },
+  });
   await saveCustomerRecord(record);
   return record;
 };
@@ -267,11 +277,28 @@ export const recordRewardScan = async (
       record.activeRewards.push(rewardProgress);
     }
   }
+
+  appendTransactionLog(record, {
+    timestamp: now,
+    action: 'SCAN',
+    data: {
+      type: 'reward',
+      rewardId,
+      rewardName,
+      businessId,
+      businessName: businessName ?? undefined,
+      pointsAwarded,
+      pointsRequired,
+    },
+  });
   
   await saveCustomerRecordLocalOnly(record);
   
   return { record, rewardProgress, isNewlyEarned };
 };
+
+/** Optional context when scanning campaign vs campaign_item QR (for transaction log). */
+export type CampaignScanSource = { type: 'campaign' } | { type: 'campaign_item'; itemType?: string; itemName?: string };
 
 /**
  * Record a campaign scan
@@ -283,7 +310,8 @@ export const recordCampaignScan = async (
   pointsRequired: number,
   businessId: string = 'default',
   businessName?: string,
-  qrCode?: string
+  qrCode?: string,
+  scanSource?: CampaignScanSource
 ): Promise<{ record: CustomerRecord; campaignProgress: CustomerCampaignProgress; isNewlyEarned: boolean }> => {
   const now = new Date().toISOString();
   const record = await getCustomerRecord();
@@ -356,6 +384,24 @@ export const recordCampaignScan = async (
       record.activeCampaigns.push(campaignProgress);
     }
   }
+
+  const scanType = scanSource?.type ?? 'campaign';
+  appendTransactionLog(record, {
+    timestamp: now,
+    action: 'SCAN',
+    data: {
+      type: scanType,
+      campaignId,
+      campaignName,
+      businessId,
+      businessName: businessName ?? undefined,
+      pointsAwarded,
+      pointsRequired,
+      ...(scanType === 'campaign_item' && scanSource?.type === 'campaign_item'
+        ? { itemType: scanSource.itemType, itemName: scanSource.itemName }
+        : {}),
+    },
+  });
   
   await saveCustomerRecordLocalOnly(record);
   
@@ -441,6 +487,18 @@ export const redeemCampaign = async (campaignId: string): Promise<CustomerCampai
   campaign.redeemedAt = now;
   record.redeemedCampaigns.push(campaign);
   record.stats.totalCampaignsRedeemed++;
+
+  appendTransactionLog(record, {
+    timestamp: now,
+    action: 'ACTION',
+    data: {
+      type: 'redeem',
+      target: 'campaign',
+      campaignId,
+      campaignName: campaign.campaignName,
+      businessId: campaign.businessId,
+    },
+  });
   
   await saveCustomerRecord(record);
   
