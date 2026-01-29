@@ -51,6 +51,7 @@ import WelcomePage from './src/components/WelcomePage';
 import FAQsPage from './src/components/FAQsPage';
 import AboutPage from './src/components/AboutPage';
 import TermsConditionsPage from './src/components/TermsConditionsPage';
+import EventLogPage from './src/components/EventLogPage';
 import PrivacyPolicyPage from './src/components/PrivacyPolicyPage';
 import LearnMorePage from './src/components/LearnMorePage';
 import RewardDetailPage from './src/components/RewardDetailPage';
@@ -310,6 +311,14 @@ function App(): React.JSX.Element {
             onNavigate={handleNavigate}
             onBack={handleBack}
             onScanPress={handleScanPress}
+            onSignInSuccess={async () => {
+              try {
+                const loaded = await loadRewards();
+                setRewards(loaded ?? []);
+              } catch (e) {
+                console.error('[App] Refresh rewards after Account sign-in:', e);
+              }
+            }}
           />
         );
       case 'Orders':
@@ -383,6 +392,15 @@ function App(): React.JSX.Element {
       case 'About':
         return (
           <AboutPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'EventLog':
+        return (
+          <EventLogPage
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}

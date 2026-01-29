@@ -23,6 +23,8 @@ interface AccountPageProps {
   onNavigate: (screen: string) => void;
   onBack?: () => void;
   onScanPress?: () => void;
+  /** Called after sign-in (hydrate + save) so App can refresh rewards. */
+  onSignInSuccess?: () => void;
 }
 
 const AccountPage: React.FC<AccountPageProps> = ({
@@ -30,6 +32,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
   onNavigate,
   onBack,
   onScanPress,
+  onSignInSuccess,
 }) => {
   const [customerName, setCustomerName] = useState('Loading...');
   const [customerEmail, setCustomerEmail] = useState('Loading...');
@@ -134,6 +137,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
       setCustomerName(name || 'User');
       setCustomerEmail(record.email ?? email);
       setSignInEmail('');
+      onSignInSuccess?.();
       Alert.alert(
         'Signed in',
         `Welcome, ${name || email}. Your rewards have been loaded.`,

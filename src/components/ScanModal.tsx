@@ -18,7 +18,7 @@ import {loadRewards, saveRewards, type CustomerReward} from '../utils/dataStorag
 import {parseQRCode, isValidQRCode} from '../utils/qrCodeUtils';
 import {canonicalName, namesMatch} from '../utils/campaignStampUtils';
 import {loadBusinesses, addOrUpdateBusiness, type MemberBusiness} from '../utils/businessStorage';
-import {recordRewardScan, recordCampaignScan} from '../services/customerRecord';
+import {getCustomerRecord, recordRewardScan, recordCampaignScan} from '../services/customerRecord';
 
 // Check if browser supports native BarcodeDetector API
 const supportsBarcodeDetector = (): boolean => {
@@ -326,10 +326,18 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
       );
 
-      const alreadyCollected = existingCampaign?.collectedItems?.some(
+      // Duplicate check: use both flat list and customer record so we block duplicates even when UI state is stale (e.g. before hydrate).
+      const record = await getCustomerRecord();
+      const recordCampaign = [...record.activeCampaigns, ...record.earnedCampaigns, ...record.redeemedCampaigns].find(
+        c => c.campaignId === campaignId
+      );
+      const alreadyInFlat = existingCampaign?.collectedItems?.some(
         (c) => c.itemType === itemType && namesMatch(c.itemName, itemName)
       );
-      if (alreadyCollected && itemName) {
+      const alreadyInRecord = recordCampaign?.collectedItems?.some(
+        (c) => c.itemType === itemType && namesMatch(c.itemName, itemName)
+      );
+      if ((alreadyInFlat || alreadyInRecord) && itemName) {
         await handleValidationError('This has already been claimed against this reward.');
         return;
       }
@@ -343,7 +351,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         pointsRequired,
         businessId,
         businessName,
-        qrValue
+        qrValue,
+        { type: 'campaign_item', itemType, itemName }
       );
 
       // Create or update campaign as a CustomerReward for carousel display
@@ -363,10 +372,20 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         if (endDate != null) existingCampaign.endDate = endDate;
         existingCampaign.selectedProducts = [...allProducts];
         existingCampaign.selectedActions = [...allActions];
-        const prev = existingCampaign.collectedItems || [];
-        const key = `${itemType}:${itemName}`;
-        if (itemName && !prev.some((c) => `${c.itemType}:${c.itemName}` === key)) {
-          existingCampaign.collectedItems = [...prev, { itemType, itemName }];
+        // Merge record's collectedItems with flat list so we never lose stamps when flat list was stale (e.g. before hydrate).
+        const fromRecord = recordCampaign?.collectedItems ?? [];
+        const fromFlat = existingCampaign.collectedItems ?? [];
+        const prev: { itemType: string; itemName: string }[] = [];
+        for (const c of [...fromRecord, ...fromFlat]) {
+          if (!prev.some((p) => p.itemType === c.itemType && namesMatch(p.itemName, c.itemName))) prev.push(c);
+        }
+        const list = itemType === 'product' ? allProducts : allActions;
+        const canonical = itemName ? canonicalName(list, itemName) : '';
+        const isDuplicate = !!canonical && prev.some((c) => c.itemType === itemType && namesMatch(c.itemName, canonical));
+        if (canonical && !isDuplicate) {
+          existingCampaign.collectedItems = [...prev, { itemType, itemName: canonical }];
+        } else if (prev.length > 0) {
+          existingCampaign.collectedItems = prev;
         }
 
         const updatedRewards = existingRewards.map(r =>
@@ -509,7 +528,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         pointsRequired,
         businessId,
         businessName,
-        qrValue
+        qrValue,
+        { type: 'campaign' }
       );
 
       // Create new campaign entry (re-scan already rejected above)

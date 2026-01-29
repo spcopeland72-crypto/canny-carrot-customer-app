@@ -171,6 +171,16 @@ const MorePage: React.FC<MorePageProps> = ({
 
           <TouchableOpacity
             style={styles.helpItem}
+            onPress={() => onNavigate('EventLog')}>
+            <View style={styles.helpIconContainer}>
+              <Text style={styles.helpIcon}>📋</Text>
+            </View>
+            <Text style={styles.helpText}>Event Log</Text>
+            <Text style={styles.helpArrow}>→</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.helpItem}
             onPress={() => onNavigate('TermsConditions')}>
             <View style={styles.helpIconContainer}>
               <Text style={styles.helpIcon}>📄</Text>
