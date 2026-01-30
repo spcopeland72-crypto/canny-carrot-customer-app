@@ -783,7 +783,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       earned={earned}
                       total={total}
                       size={80}
-                      circleColor={undefined}
+                      circleColor={card.tokenKind === 'campaign' ? '#74A71C' : undefined}
                     />
                     {isEarned && (
                       <TouchableOpacity
