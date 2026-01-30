@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import {Colors} from '../constants/Colors';
+import {getCustomerRecord} from '../services/customerRecord';
 import BottomNavigation from './BottomNavigation';
 
 interface PersonalDetailsPageProps {
@@ -26,15 +27,35 @@ const PersonalDetailsPage: React.FC<PersonalDetailsPageProps> = ({
   onBack,
   onScanPress,
 }) => {
-  const [firstName, setFirstName] = useState('Simon');
-  const [lastName, setLastName] = useState('Copeland');
-  const [email, setEmail] = useState('Copeland_simon@yahoo.co.uk');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
   const [city, setCity] = useState('');
   const [postcode, setPostcode] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    getCustomerRecord().then((record) => {
+      if (!mounted || !record?.profile) return;
+      const p = record.profile;
+      const name = (p.name ?? '').trim();
+      const parts = name ? name.split(/\s+/) : [];
+      setFirstName(parts[0] ?? '');
+      setLastName(parts.slice(1).join(' ') ?? '');
+      setEmail(p.email ?? '');
+      setPhone(p.phone ?? '');
+      setDateOfBirth(p.dateOfBirth ?? '');
+      setAddressLine1(p.addressLine1 ?? '');
+      setAddressLine2(p.addressLine2 ?? '');
+      setCity(p.city ?? '');
+      setPostcode(p.postcode ?? '');
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -49,6 +70,9 @@ const PersonalDetailsPage: React.FC<PersonalDetailsPageProps> = ({
         email: email || undefined,
         phone: phone || undefined,
         dateOfBirth: dateOfBirth || undefined,
+        addressLine1: addressLine1 || undefined,
+        addressLine2: addressLine2 || undefined,
+        city: city || undefined,
         postcode: postcode || undefined,
       });
       

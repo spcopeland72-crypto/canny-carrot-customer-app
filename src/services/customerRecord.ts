@@ -14,6 +14,7 @@ import type {
   CustomerCampaignProgress,
   CustomerProfile,
   RewardProgressStatus,
+  TransactionLogEntry,
 } from '../types/customer';
 import { createEmptyCustomerRecord, appendTransactionLog } from '../types/customer';
 
@@ -158,11 +159,36 @@ export const hydrateCustomerRecordFromApi = (
     record.stats.totalRewardsRedeemed = apiRecord.totalRedemptions;
     record.stats.totalCampaignsRedeemed = 0;
   }
+  // Rehydrate: event log is last 100 activities from Redis so it shows again after logout/login.
   if (Array.isArray(apiRecord.transactionLog)) {
-    record.transactionLog = apiRecord.transactionLog.slice(-TRANSACTION_LOG_MAX_HYDRATE);
+    record.transactionLog = apiRecord.transactionLog.slice(-100) as TransactionLogEntry[];
   }
   // Preserve server timestamp — immutable rule: only create/edit changes updatedAt; hydrate is not an edit
   record.updatedAt = apiRecord.updatedAt ?? record.updatedAt ?? now;
+};
+
+/**
+ * Append a single EVENT:LOGIN to the transaction log (e.g. after login/hydrate).
+ * Hydrate writes are not edits; this is the only event we add for login.
+ */
+export const appendLoginEvent = (record: CustomerRecord): void => {
+  appendTransactionLog(record, {
+    timestamp: new Date().toISOString(),
+    action: 'EVENT:LOGIN',
+    data: {},
+  });
+};
+
+/**
+ * Append a single EVENT:LOGOUT to the transaction log (before sync on logout).
+ * So the full log including logout is synced to Redis.
+ */
+export const appendLogoutEvent = (record: CustomerRecord): void => {
+  appendTransactionLog(record, {
+    timestamp: new Date().toISOString(),
+    action: 'EVENT:LOGOUT',
+    data: {},
+  });
 };
 
 /**

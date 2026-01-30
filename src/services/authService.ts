@@ -62,13 +62,19 @@ export const loginCustomer = async (
 };
 
 /**
- * Logout: sync, clear auth and customer data. Same pattern as business.
+ * Logout: append EVENT:LOGOUT to the log, sync (so Redis gets the full log), then clear auth and customer data.
  */
 export const logoutCustomer = async (): Promise<void> => {
   try {
+    const { getCustomerRecordForSync, appendLogoutEvent, saveCustomerRecord } = await import('./customerRecord');
     const { performCustomerFullSync } = await import('./customerLogout');
     const { clearCustomerId, storage } = await import('./localStorage');
     const { clearBusinessDetails } = await import('./businessDetailsStorage');
+    const record = await getCustomerRecordForSync();
+    if (record) {
+      appendLogoutEvent(record);
+      await saveCustomerRecord(record, { preserveUpdatedAt: true });
+    }
     await performCustomerFullSync();
     await clearCustomerId();
     await storage.delete('customerRecord');

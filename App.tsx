@@ -34,7 +34,7 @@ import {loadRewards, saveRewards, type CustomerReward} from './src/utils/dataSto
 import {getStoredAuth} from './src/services/authService';
 import {getById} from './src/services/customerApi';
 import {setCustomerId} from './src/services/localStorage';
-import {updateCustomerProfile, hydrateCustomerRecordFromApi, getCustomerRecord, saveCustomerRecord} from './src/services/customerRecord';
+import {hydrateCustomerRecordFromApi, getCustomerRecord, saveCustomerRecord, appendLoginEvent} from './src/services/customerRecord';
 import SearchPage from './src/components/SearchPage';
 import GeoSearchPage from './src/components/GeoSearch/GeoSearchPage';
 import ScanPage from './src/components/ScanPage';
@@ -198,15 +198,18 @@ function App(): React.JSX.Element {
       await setCustomerId(auth.customerId);
       const apiRecord = await getById(auth.customerId);
       if (apiRecord) {
-        const name = [apiRecord.firstName, apiRecord.lastName].filter(Boolean).join(' ').trim();
-        await updateCustomerProfile({
-          id: apiRecord.id,
-          name: name || undefined,
-          email: apiRecord.email ?? auth.email,
-          phone: apiRecord.phone,
-        });
         const record = await getCustomerRecord();
+        const name = [apiRecord.firstName, apiRecord.lastName].filter(Boolean).join(' ').trim();
+        record.profile = {
+          ...record.profile,
+          id: apiRecord.id,
+          name: name || record.profile?.name,
+          email: (apiRecord.email ?? auth.email) ?? record.profile?.email,
+          phone: apiRecord.phone ?? record.profile?.phone,
+          updatedAt: record.profile?.updatedAt ?? record.updatedAt ?? '',
+        };
         hydrateCustomerRecordFromApi(record, apiRecord);
+        appendLoginEvent(record);
         await saveCustomerRecord(record, { preserveUpdatedAt: true });
 
         const rewardsList = Array.isArray(apiRecord.rewards) ? apiRecord.rewards : [];

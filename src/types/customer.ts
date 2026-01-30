@@ -15,6 +15,9 @@ export interface CustomerProfile {
   email?: string;
   phone?: string;
   dateOfBirth?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
   postcode?: string;
   preferences?: {
     notifications: boolean;
@@ -115,7 +118,7 @@ export interface CustomerCampaignProgress {
 // TRANSACTION LOG (date:time:ACTION + data)
 // ============================================
 
-export type TransactionAction = 'SCAN' | 'EDIT' | 'ACTION';
+export type TransactionAction = 'SCAN' | 'EDIT' | 'ACTION' | 'EVENT:LOGIN' | 'EVENT:LOGOUT';
 
 /** One log entry: date:time:ACTION with structured data. */
 export interface TransactionLogEntry {

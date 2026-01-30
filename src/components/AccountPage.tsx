@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {Colors} from '../constants/Colors';
 import BottomNavigation from './BottomNavigation';
-import {getCustomerRecord, updateCustomerProfile, hydrateCustomerRecordFromApi, saveCustomerRecord} from '../services/customerRecord';
+import {getCustomerRecord, hydrateCustomerRecordFromApi, saveCustomerRecord, appendLoginEvent} from '../services/customerRecord';
 import {getCustomerId, setCustomerId} from '../services/localStorage';
 import {getByEmail} from '../services/customerApi';
 import {pullBusinessDetailsForCustomer} from '../services/businessDetailsStorage';
@@ -117,16 +117,17 @@ const AccountPage: React.FC<AccountPageProps> = ({
       }
       await setCustomerId(record.id);
       const name = [record.firstName, record.lastName].filter(Boolean).join(' ').trim();
-      await updateCustomerProfile({
-        id: record.id,
-        name: name || undefined,
-        email: record.email ?? email,
-        phone: record.phone,
-      });
-      // Hydrate customerRecord reward/campaign arrays so logout sync does not overwrite Redis with empty data.
-      // Save with preserveUpdatedAt so we keep server timestamp — no edit means logout won't overwrite Redis.
       const localRecord = await getCustomerRecord();
+      localRecord.profile = {
+        ...localRecord.profile,
+        id: record.id,
+        name: name || localRecord.profile?.name,
+        email: (record.email ?? email) ?? localRecord.profile?.email,
+        phone: record.phone ?? localRecord.profile?.phone,
+        updatedAt: localRecord.profile?.updatedAt ?? localRecord.updatedAt ?? '',
+      };
       hydrateCustomerRecordFromApi(localRecord, record);
+      appendLoginEvent(localRecord);
       await saveCustomerRecord(localRecord, { preserveUpdatedAt: true });
       const rewards = Array.isArray(record.rewards) ? record.rewards : [];
       const businessIds = [...new Set(

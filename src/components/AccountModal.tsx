@@ -51,16 +51,9 @@ const AccountModal: React.FC<AccountModalProps> = ({
 
   const handleLogout = async () => {
     try {
-      const result = await logoutCustomer();
+      await logoutCustomer();
       onClose();
-      if (result.didLogout && onLogout) {
-        onLogout();
-      } else if (!result.didLogout && result.error) {
-        Alert.alert(
-          'Logout deferred',
-          'Sync failed. Local data was kept. Try Sync first, then Logout again, or check your connection.'
-        );
-      }
+      if (onLogout) onLogout();
     } catch (error) {
       console.error('❌ [CUSTOMER LOGOUT] Error logging out:', error);
       Alert.alert('Logout error', (error as Error)?.message ?? 'Could not log out.');
