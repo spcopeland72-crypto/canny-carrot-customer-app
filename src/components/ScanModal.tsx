@@ -299,10 +299,13 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
     // Handle CAMPAIGN_ITEM format (from business app)
     if (parsed.type === 'campaign_item') {
       const itemData = parsed.data as any; // ParsedCampaignItemQR
+      const campaignId = (itemData.campaignId && String(itemData.campaignId).trim()) || '';
+      if (!campaignId) {
+        await handleValidationError('Invalid or outdated campaign QR. Please ask the business for a new QR code.');
+        return;
+      }
       const businessId = (itemData.businessId || '').trim() || 'default';
       const campaignName = itemData.campaignName || 'Campaign';
-      const slug = campaignName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'campaign';
-      const campaignId = (itemData.campaignId && String(itemData.campaignId).trim()) || `${businessId}-${slug}`;
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
 

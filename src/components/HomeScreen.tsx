@@ -417,11 +417,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         if (i >= 0) stampedIndices.push(products.length + i);
       }
     }
-    let businessId = reward.businessId;
-    if (!businessId && reward.id.startsWith('campaign-')) {
-      const parts = reward.id.slice(9).split('-');
-      if (parts.length >= 2) businessId = parts[0];
-    }
+    const businessId = reward.businessId;
     const businessName = (reward.businessName ?? '').trim() || undefined;
     return {
       id: reward.id,
@@ -434,7 +430,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       pinCode: reward.pinCode,
       qrCode: reward.qrCode,
       businessName,
-      businessId: businessId || reward.businessId,
+      businessId: businessId ?? reward.businessId,
       circleLabels,
       stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
     };
@@ -787,7 +783,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       earned={earned}
                       total={total}
                       size={80}
-                      circleColor={card.id.startsWith('campaign-') ? '#74A71C' : undefined}
+                      circleColor={card.tokenKind === 'campaign' ? '#74A71C' : undefined}
                     />
                     {isEarned && (
                       <TouchableOpacity

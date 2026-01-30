@@ -184,11 +184,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
         if (i >= 0) stampedIndices.push(products.length + i);
       }
     }
-    let bid = reward.businessId;
-    if (!bid && reward.id.startsWith('campaign-')) {
-      const parts = reward.id.slice(9).split('-');
-      if (parts.length >= 2) bid = parts[0];
-    }
+    const bid = reward.businessId;
     const businessNameVal = (reward.businessName ?? '').trim() || undefined;
     return {
       id: reward.id,
@@ -200,7 +196,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
       pinCode: reward.pinCode,
       qrCode: reward.qrCode,
       businessName: businessNameVal,
-      businessId: bid || reward.businessId,
+      businessId: bid ?? reward.businessId,
       circleLabels,
       stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
     };
@@ -225,12 +221,10 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
 
   const handleRedeem = async (enteredPin: string): Promise<boolean> => {
     if (!selectedRewardForRedemption) return false;
-    const id = selectedRewardForRedemption.id.startsWith('campaign-')
-      ? selectedRewardForRedemption.id.slice(9)
-      : selectedRewardForRedemption.id;
+    const id = selectedRewardForRedemption.id;
     const name = selectedRewardForRedemption.title;
     try {
-      const isCampaign = selectedRewardForRedemption.id.startsWith('campaign-');
+      const isCampaign = selectedRewardForRedemption.tokenKind === 'campaign';
       if (isCampaign) {
         const { redeemCampaign } = await import('../services/customerRecord');
         await redeemCampaign(id);
@@ -448,7 +442,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
                         earned={earned}
                         total={total}
                         size={80}
-                        circleColor={card.id.startsWith('campaign-') ? '#74A71C' : undefined}
+                        circleColor={card.tokenKind === 'campaign' ? '#74A71C' : undefined}
                       />
                       {card.isEarned && (
                         <View style={styles.redeemBadge}><Text style={styles.redeemBadgeText}>🎁</Text></View>

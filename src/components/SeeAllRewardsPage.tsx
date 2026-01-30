@@ -186,15 +186,7 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             count={selectedReward?.count ?? 0}
             total={selectedReward?.total ?? 0}
             businessName={(selectedReward?.businessName ?? '').trim() || undefined}
-            businessId={(() => {
-              if (!selectedReward) return undefined;
-              let bid = selectedReward.businessId;
-              if (!bid && selectedReward.id.startsWith('campaign-')) {
-                const parts = selectedReward.id.slice(9).split('-');
-                if (parts.length >= 2) bid = parts[0];
-              }
-              return bid;
-            })()}
+            businessId={selectedReward?.businessId}
             circleLabels={(() => {
               if (!selectedReward || (selectedReward.total ?? 0) <= 0) return undefined;
               const total = selectedReward.total ?? 0;
@@ -298,7 +290,7 @@ const SeeAllRewardsPage: React.FC<SeeAllRewardsPageProps> = ({
             <View style={styles.modalOverlay}>
               <View style={styles.deleteModal}>
                 <Text style={styles.deleteModalTitle}>
-                  {rewardToDelete?.id.startsWith('campaign-') ? 'Delete Campaign?' : 'Delete Reward?'}
+                  {rewardToDelete?.tokenKind === 'campaign' ? 'Delete Campaign?' : 'Delete Reward?'}
                 </Text>
                 <Text style={styles.deleteModalMessage}>
                   Are you sure you want to delete "{rewardToDelete?.name}"? This action cannot be undone.
