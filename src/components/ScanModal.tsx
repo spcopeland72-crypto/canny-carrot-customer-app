@@ -302,7 +302,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const businessId = (itemData.businessId || '').trim() || 'default';
       const campaignName = itemData.campaignName || 'Campaign';
       const slug = campaignName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'campaign';
-      const campaignId = `${businessId}-${slug}`;
+      const campaignId = (itemData.campaignId && String(itemData.campaignId).trim()) || `${businessId}-${slug}`;
       const itemType = itemData.itemType || 'product';
       const itemName = itemData.itemName || '';
 

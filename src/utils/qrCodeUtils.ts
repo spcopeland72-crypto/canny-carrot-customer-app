@@ -130,8 +130,9 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
   }
   
   // Handle CAMPAIGN_ITEM QR codes (from business app)
-  // Format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
-  // productsPart/actionsPart are always the LAST two segments (||-joined). Use that so colons in names don't break parsing.
+  // New format: CAMPAIGN_ITEM:{campaignId}:{businessId}:{businessName}:{campaignName}:{itemType}:{itemName}:{startDate}:{endDate}:{productsPart}:{actionsPart}
+  // Old format: CAMPAIGN_ITEM:{businessId}:{businessName}:{campaignName}:... (no campaignId; customer app used businessId-slug)
+  // productsPart/actionsPart are always the LAST two segments (||-joined).
   if (normalizedQr.startsWith('CAMPAIGN_ITEM:')) {
     const parts = normalizedQr.split(':');
     if (parts.length >= 10) {
@@ -139,19 +140,22 @@ export const parseQRCode = (qrValue: string): ParsedQR => {
       const productsPart = (parts[parts.length - 2] || '').trim();
       const allProducts = productsPart ? productsPart.split('||').map((p) => p.trim()).filter(Boolean) : [];
       const allActions = actionsPart ? actionsPart.split('||').map((a) => a.trim()).filter(Boolean) : [];
-      const businessId = (parts[1] || '').trim();
-      const businessName = (parts[2] || '').trim() || undefined;
-      const campaignName = parts.length > 10 ? parts.slice(3, parts.length - 6).join(':').trim() || 'Campaign' : (parts[3] || 'Campaign');
       const itemType = (parts[parts.length - 6] || 'product').trim();
       const itemName = (parts[parts.length - 5] || '').trim();
       const startDate = (parts[parts.length - 4] || '').trim();
       const endDate = (parts[parts.length - 3] || '').trim();
+      const hasCampaignIdInQr = parts.length >= 11 && parts[1] && !parts[1].includes(' ');
+      const businessId = hasCampaignIdInQr ? (parts[2] || '').trim() : (parts[1] || '').trim();
+      const businessName = (hasCampaignIdInQr ? parts[3] : parts[2] || '').trim() || undefined;
+      const campaignNameRange = hasCampaignIdInQr ? [4, parts.length - 6] : [3, parts.length - 6];
+      const campaignName = parts.slice(campaignNameRange[0], campaignNameRange[1]).join(':').trim() || 'Campaign';
+      const campaignId = hasCampaignIdInQr ? (parts[1] || '').trim() : '';
       return {
         type: 'campaign_item',
         data: {
           businessId,
           businessName,
-          campaignId: businessId,
+          campaignId,
           campaignName,
           itemType,
           itemName,
