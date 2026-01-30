@@ -105,6 +105,8 @@ interface RewardCard {
   qrCode?: string;
   businessName?: string;
   businessId?: string;
+  startDate?: string;
+  collectedItems?: { itemType: string; itemName: string }[];
   circleLabels?: string[];
   stampedIndices?: number[];
 }
@@ -197,6 +199,8 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
       qrCode: reward.qrCode,
       businessName: businessNameVal,
       businessId: bid ?? reward.businessId,
+      startDate: reward.startDate,
+      collectedItems: reward.collectedItems,
       circleLabels,
       stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
     };
@@ -224,7 +228,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
     const id = selectedRewardForRedemption.id;
     const name = selectedRewardForRedemption.title;
     try {
-      const isCampaign = selectedRewardForRedemption.tokenKind === 'campaign';
+      const isCampaign = selectedRewardForRedemption.startDate != null || (Array.isArray(selectedRewardForRedemption.collectedItems) && selectedRewardForRedemption.collectedItems.length > 0);
       if (isCampaign) {
         const { redeemCampaign } = await import('../services/customerRecord');
         await redeemCampaign(id);
@@ -442,7 +446,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
                         earned={earned}
                         total={total}
                         size={80}
-                        circleColor={card.tokenKind === 'campaign' ? '#74A71C' : undefined}
+                        circleColor={(card.startDate != null || (Array.isArray(card.collectedItems) && card.collectedItems.length > 0)) ? '#74A71C' : undefined}
                       />
                       {card.isEarned && (
                         <View style={styles.redeemBadge}><Text style={styles.redeemBadgeText}>🎁</Text></View>
