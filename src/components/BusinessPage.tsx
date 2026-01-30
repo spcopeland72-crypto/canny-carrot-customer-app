@@ -442,7 +442,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
                         earned={earned}
                         total={total}
                         size={80}
-                        circleColor={card.tokenKind === 'campaign' ? '#74A71C' : undefined}
+                        circleColor={undefined}
                       />
                       {card.isEarned && (
                         <View style={styles.redeemBadge}><Text style={styles.redeemBadgeText}>🎁</Text></View>

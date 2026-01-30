@@ -49,7 +49,7 @@ export default function CampaignProgressCircle({
   earned,
   total,
   size = 80,
-  circleColor = Colors.grey,
+  circleColor = '#74A71C',
 }: CampaignProgressCircleProps) {
   const cx = size / 2;
   const cy = size / 2;
