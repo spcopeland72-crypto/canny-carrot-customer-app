@@ -105,6 +105,7 @@ interface RewardCard {
   qrCode?: string;
   businessName?: string;
   businessId?: string;
+  tokenKind?: 'reward' | 'campaign';
   startDate?: string;
   collectedItems?: { itemType: string; itemName: string }[];
   circleLabels?: string[];
@@ -446,7 +447,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({
                         earned={earned}
                         total={total}
                         size={80}
-                        circleColor={(card.startDate != null || (Array.isArray(card.collectedItems) && card.collectedItems.length > 0)) ? '#74A71C' : undefined}
+                        circleColor={(card.tokenKind === 'campaign' || card.startDate != null || (Array.isArray(card.collectedItems) && card.collectedItems.length > 0)) ? '#74A71C' : undefined}
                       />
                       {card.isEarned && (
                         <View style={styles.redeemBadge}><Text style={styles.redeemBadgeText}>🎁</Text></View>

@@ -198,7 +198,8 @@ interface RewardCard {
   qrCode?: string; // QR code value for display
   businessName?: string;
   businessId?: string;
-  /** Campaign-only fields: used to detect campaign for green circle (no tokenKind dependency). */
+  tokenKind?: 'reward' | 'campaign';
+  /** Campaign-only fields: used to detect campaign for green circle. */
   startDate?: string;
   collectedItems?: { itemType: string; itemName: string }[];
   /** Fallback labels (collected + "Remaining") when campaign fetch fails. */
@@ -403,6 +404,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     businessName?: string;
     selectedProducts?: string[];
     selectedActions?: string[];
+    tokenKind?: 'reward' | 'campaign';
     collectedItems?: { itemType: string; itemName: string }[];
     startDate?: string;
   }): RewardCard => {
@@ -437,6 +439,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       businessName,
       businessId: businessId ?? reward.businessId,
       tokenKind: reward.tokenKind,
+      startDate: reward.startDate,
+      collectedItems: reward.collectedItems,
       circleLabels,
       stampedIndices: stampedIndices.length > 0 ? stampedIndices : undefined,
     };
@@ -789,7 +793,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       earned={earned}
                       total={total}
                       size={80}
-                      circleColor={(card.startDate != null || (Array.isArray(card.collectedItems) && card.collectedItems.length > 0)) ? '#74A71C' : undefined}
+                      circleColor={(card.tokenKind === 'campaign' || card.startDate != null || (Array.isArray(card.collectedItems) && card.collectedItems.length > 0)) ? '#74A71C' : undefined}
                     />
                     {isEarned && (
                       <TouchableOpacity
