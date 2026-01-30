@@ -10,6 +10,7 @@ export function recordToFlatRewards(record: CustomerRecord): CustomerReward[] {
   for (const r of [...record.activeRewards, ...record.earnedRewards, ...record.redeemedRewards]) {
     out.push({
       id: r.rewardId,
+      tokenKind: 'reward' as const,
       name: r.rewardName,
       count: r.pointsEarned,
       total: r.pointsRequired,
@@ -27,7 +28,8 @@ export function recordToFlatRewards(record: CustomerRecord): CustomerReward[] {
   }
   for (const c of [...record.activeCampaigns, ...record.earnedCampaigns, ...record.redeemedCampaigns]) {
     out.push({
-      id: `campaign-${c.campaignId}`,
+      id: c.campaignId,
+      tokenKind: 'campaign' as const,
       name: c.campaignName,
       count: c.pointsEarned,
       total: c.pointsRequired,
@@ -65,11 +67,11 @@ export function flatRewardsToRecord(record: CustomerRecord, flat: CustomerReward
     const pointsRequired = r.requirement ?? r.total;
     const earned = pointsEarned >= pointsRequired;
     const businessId = r.businessId ?? 'default';
+    const isCampaign = r.tokenKind === 'campaign';
 
-    if (r.id.startsWith('campaign-')) {
-      const campaignId = r.id.replace(/^campaign-/, '');
+    if (isCampaign) {
       const c: CustomerCampaignProgress = {
-        campaignId,
+        campaignId: r.id,
         businessId,
         businessName: r.businessName,
         campaignName: r.name,
@@ -136,9 +138,10 @@ export function mapApiRewardsToLocal(items: unknown[]): CustomerReward[] {
     const id = (r?.id ?? '').toString();
     const total = typeof r?.total === 'number' ? r.total : (r?.requirement as number) ?? 1;
     const count = typeof r?.count === 'number' ? r.count : (r?.pointsEarned as number) ?? 0;
-    const isCampaign = id.startsWith('campaign-');
+    const isCampaign = r?.tokenKind === 'campaign';
     return {
       id,
+      tokenKind: isCampaign ? ('campaign' as const) : ('reward' as const),
       name: (r?.name ?? 'Reward').toString(),
       count,
       total,

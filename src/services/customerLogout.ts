@@ -34,7 +34,8 @@ function toRewardItem(r: CustomerRewardProgress): Record<string, unknown> {
 
 function toCampaignItem(c: CustomerCampaignProgress): Record<string, unknown> {
   return {
-    id: `campaign-${c.campaignId}`,
+    id: c.campaignId,
+    tokenKind: 'campaign',
     name: c.campaignName,
     count: c.pointsEarned,
     total: c.pointsRequired,

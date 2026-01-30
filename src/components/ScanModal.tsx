@@ -323,7 +323,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       // Load existing rewards; match by unique id or qrCode only
       const existingRewards = await loadRewards();
       const existingCampaign = existingRewards.find(
-        r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
+        r => r.id === campaignId || r.qrCode === qrValue
       );
 
       // Duplicate check: use both flat list and customer record so we block duplicates even when UI state is stale (e.g. before hydrate).
@@ -408,7 +408,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
         }, 100);
       } else {
         const newCampaign: CustomerReward = {
-          id: `campaign-${campaignId}`,
+          id: campaignId,
+          tokenKind: 'campaign',
           name: campaignName,
           count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
           total: Math.ceil(pointsRequired / pointsPerScan),
@@ -506,7 +507,7 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       // Load existing rewards; match by unique id or qrCode only
       const existingRewards = await loadRewards();
       const existingCampaign = existingRewards.find(
-        r => r.id === `campaign-${campaignId}` || r.qrCode === qrValue
+        r => r.id === campaignId || r.qrCode === qrValue
       );
 
       // Re-scan: user already has this campaign (same QR). Reject.
@@ -536,7 +537,8 @@ const ScanModal: React.FC<ScanModalProps> = ({visible, onClose, onRewardScanned,
       const campaignIcon = '🎯'; // Campaign icon
       const campaignType = 'action';
       const newCampaign: CustomerReward = {
-        id: `campaign-${campaignId}`,
+        id: campaignId,
+        tokenKind: 'campaign',
         name: campaignName,
         count: Math.floor(campaignProgress.pointsEarned / pointsPerScan),
         total: Math.ceil(pointsRequired / pointsPerScan),

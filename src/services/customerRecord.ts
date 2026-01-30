@@ -110,10 +110,10 @@ export const hydrateCustomerRecordFromApi = (
     const businessId = (item?.businessId ?? 'default') as string;
     const businessName = item?.businessName as string | undefined;
 
-    if (id.startsWith('campaign-')) {
-      const campaignId = id.replace(/^campaign-/, '');
+    const isCampaign = (item as { tokenKind?: string })?.tokenKind === 'campaign';
+    if (isCampaign) {
       const c: CustomerCampaignProgress = {
-        campaignId,
+        campaignId: id,
         businessId,
         businessName,
         campaignName: (item?.name ?? 'Campaign').toString(),

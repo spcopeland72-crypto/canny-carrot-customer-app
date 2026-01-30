@@ -10,6 +10,8 @@ export interface CustomerReward {
   icon: string;
   businessLogo?: string;
   type?: 'product' | 'action';
+  /** Token kind: reward vs campaign. Same id format (document id) for both. */
+  tokenKind?: 'reward' | 'campaign';
   requirement: number;
   pointsPerPurchase?: number;
   rewardType?: 'free_product' | 'discount' | 'other';
