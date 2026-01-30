@@ -113,7 +113,7 @@ export function flatRewardsToRecord(record: CustomerRecord, flat: CustomerReward
   const businessesVisited = [...new Set(flat.map((r) => r.businessId).filter(Boolean))] as string[];
   return {
     ...record,
-    updatedAt: now,
+    updatedAt: record.updatedAt ?? '',
     activeRewards,
     earnedRewards,
     redeemedRewards,

@@ -159,12 +159,16 @@ export const hydrateCustomerRecordFromApi = (
     record.stats.totalRewardsRedeemed = apiRecord.totalRedemptions;
     record.stats.totalCampaignsRedeemed = 0;
   }
-  // Rehydrate: event log is last 100 activities from Redis so it shows again after logout/login.
-  if (Array.isArray(apiRecord.transactionLog)) {
+
+  // Data flows newest to oldest only. Only overwrite transactionLog/updatedAt from API when server is newer.
+  // Hydrate never sets "now" — only create/edit/new event may set updatedAt.
+  const localTs = (record.updatedAt ?? '').trim();
+  const serverTs = (apiRecord.updatedAt ?? '').trim();
+  const serverNewer = serverTs && (localTs ? serverTs > localTs : true);
+  if (serverNewer && Array.isArray(apiRecord.transactionLog)) {
     record.transactionLog = apiRecord.transactionLog.slice(-100) as TransactionLogEntry[];
   }
-  // Preserve server timestamp — immutable rule: only create/edit changes updatedAt; hydrate is not an edit
-  record.updatedAt = apiRecord.updatedAt ?? record.updatedAt ?? now;
+  record.updatedAt = serverNewer ? (apiRecord.updatedAt ?? record.updatedAt) : record.updatedAt;
 };
 
 /**
