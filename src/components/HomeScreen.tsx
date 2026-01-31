@@ -28,6 +28,7 @@ import RedeemModal from './RedeemModal';
 import CongratulationsModal from './CongratulationsModal';
 import RewardQRCodeModal from './RewardQRCodeModal';
 import AccountModal from './AccountModal';
+import SaveHomeContent from './SaveHomeContent';
 import {getCustomerRecord, redeemReward} from '../services/customerRecord';
 import {loadRewards, saveRewards} from '../utils/dataStorage';
 import {indexInList} from '../utils/campaignStampUtils';
@@ -517,7 +518,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             {greeting}, {userName} <Text style={styles.versionText}> v{Constants.expoConfig?.version || '1.0.0'}</Text>
           </Text>
           
-          {/* Right: help + Rewards/Save toggle + notifications (same pattern as business app Online/In-store) */}
+          {/* Right: help + Rewards/Save toggle (banner colour only; no notification bell) */}
           <View style={styles.headerIcons}>
             <TouchableOpacity
               style={[styles.iconButton, {marginRight: 12}]}
@@ -533,25 +534,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={[styles.modeButtonText, mode === 'save' && styles.modeButtonTextActive]}>
                 {mode === 'rewards' ? 'Save' : 'Rewards'}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconButton, {marginLeft: 12}]}
-              onPress={() => setNotificationsModalVisible(true)}>
-              <View style={styles.bellIconContainer}>
-                {/* Bell handle/loop at top */}
-                <View style={styles.bellHandle} />
-                {/* Bell body - rounded shape, wider at bottom */}
-                <View style={styles.bellBody}>
-                  {/* Bottom horizontal band */}
-                  <View style={styles.bellBottomBand} />
-                </View>
-                {/* Clapper/opening at very bottom */}
-                <View style={styles.bellClapper} />
-                {/* Red dot indicator for unread notifications */}
-                {hasUnreadNotifications && (
-                  <View style={styles.notificationDot} />
-                )}
-              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -764,6 +746,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
+        {mode === 'save' ? (
+          <SaveHomeContent />
+        ) : (
+          <>
         {/* Ticker - Exact CodePen implementation - Below banner */}
         {/* Ticker - EXACT CodePen: one string, seamless wrap */}
         <View style={styles.tickerWrap}>
@@ -1068,6 +1054,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </TouchableOpacity>
         </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Bottom Navigation */}
