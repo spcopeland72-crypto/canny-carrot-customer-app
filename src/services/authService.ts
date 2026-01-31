@@ -62,7 +62,8 @@ export const loginCustomer = async (
 };
 
 /**
- * Logout: append EVENT:LOGOUT to the log, sync (so Redis gets the full log), then clear auth and customer data.
+ * Logout: append EVENT:LOGOUT to the transaction log before logout completes, then sync, then clear auth and customer data.
+ * The event is in the record’s event log for the logout sync (body includes transactionLog). No timestamp bump.
  */
 export const logoutCustomer = async (): Promise<void> => {
   try {

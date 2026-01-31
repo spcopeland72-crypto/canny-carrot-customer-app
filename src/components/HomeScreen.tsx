@@ -1505,7 +1505,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   redeemBadgeText: {
-    fontSize: 18,
+    fontSize: 36,
   },
   goodieCard: {
     width: RECTANGULAR_CARD_WIDTH,
