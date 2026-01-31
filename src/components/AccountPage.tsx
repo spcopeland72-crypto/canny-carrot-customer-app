@@ -128,7 +128,7 @@ const AccountPage: React.FC<AccountPageProps> = ({
       };
       hydrateCustomerRecordFromApi(localRecord, record);
       appendLoginEvent(localRecord);
-      await saveCustomerRecord(localRecord, { preserveUpdatedAt: true });
+      await saveCustomerRecord(localRecord);
       const rewards = Array.isArray(record.rewards) ? record.rewards : [];
       const businessIds = [...new Set(
         (rewards as { businessId?: string }[]).map((r) => r.businessId).filter((id): id is string => !!id && id !== 'default')

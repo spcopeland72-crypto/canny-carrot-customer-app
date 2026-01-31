@@ -62,8 +62,7 @@ export const loginCustomer = async (
 };
 
 /**
- * Logout: append EVENT:LOGOUT to the transaction log before logout completes, then sync, then clear auth and customer data.
- * The event is in the record’s event log for the logout sync (body includes transactionLog). No timestamp bump.
+ * Logout: first action is append EVENT:LOGOUT to the event log; then complete logout (save, sync, clear auth and customer data).
  */
 export const logoutCustomer = async (): Promise<void> => {
   try {
@@ -75,8 +74,10 @@ export const logoutCustomer = async (): Promise<void> => {
     if (record) {
       appendLogoutEvent(record);
       await saveCustomerRecord(record, { preserveUpdatedAt: true });
+      await performCustomerFullSync(record);
+    } else {
+      await performCustomerFullSync();
     }
-    await performCustomerFullSync();
     await clearCustomerId();
     await storage.delete('customerRecord');
     await clearBusinessDetails();

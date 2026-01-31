@@ -107,15 +107,16 @@ function buildSyncBody(record: CustomerRecord, customerUuid: string): Record<str
  * Perform sync — timestamp decides. Only upload if local is newer than Redis.
  * If Redis is newer, do not PUT (never overwrite newer with older).
  * Used for Click Sync and Logout.
+ * When recordForSync is provided (e.g. on logout), use it so the body includes the latest log (e.g. EVENT:LOGOUT).
  */
-export const performCustomerFullSync = async (): Promise<{
+export const performCustomerFullSync = async (recordForSync?: CustomerRecord | null): Promise<{
   success: boolean;
   errors: string[];
 }> => {
   const errors: string[] = [];
 
   try {
-    const record = await getCustomerRecordForSync();
+    const record = recordForSync ?? (await getCustomerRecordForSync());
     if (!record) {
       return { success: false, errors: ['No customer record found'] };
     }

@@ -160,8 +160,8 @@ export const hydrateCustomerRecordFromApi = (
     record.stats.totalCampaignsRedeemed = 0;
   }
 
-  // Data flows newest to oldest only. Only overwrite transactionLog/updatedAt from API when server is newer.
-  // Hydrate never sets "now" — only create/edit/new event may set updatedAt.
+  // Data flows newest to oldest only. When server is newer, take server's transaction log (100 lines) and updatedAt.
+  // Hydrate: download 100 lines of event log with account data; preserve it (set from API, do not overwrite with local).
   const localTs = (record.updatedAt ?? '').trim();
   const serverTs = (apiRecord.updatedAt ?? '').trim();
   const serverNewer = serverTs && (localTs ? serverTs > localTs : true);
