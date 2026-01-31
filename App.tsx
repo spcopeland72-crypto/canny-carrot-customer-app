@@ -39,6 +39,7 @@ import SearchPage from './src/components/SearchPage';
 import GeoSearchPage from './src/components/GeoSearch/GeoSearchPage';
 import ScanPage from './src/components/ScanPage';
 import WalletPage from './src/components/WalletPage';
+import SustainScreen from './src/components/SustainScreen';
 import MorePage from './src/components/MorePage';
 import FindMoreRewardsPage from './src/components/FindMoreRewardsPage';
 import AccountPage from './src/components/AccountPage';
@@ -290,6 +291,15 @@ function App(): React.JSX.Element {
       case 'Wallet':
         return (
           <WalletPage
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onBack={handleBack}
+            onScanPress={handleScanPress}
+          />
+        );
+      case 'Sustain':
+        return (
+          <SustainScreen
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
             onBack={handleBack}

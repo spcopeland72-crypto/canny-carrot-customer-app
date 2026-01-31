@@ -327,6 +327,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [hasUnreadNotifications] = useState(true); // This would come from user context/API
   const [onlineImageError, setOnlineImageError] = useState(false);
   const [onlineBlackImage, setOnlineBlackImage] = useState<any>(null);
+  const [mode, setMode] = useState<'rewards' | 'save'>('rewards');
   const [socialIcons, setSocialIcons] = useState<{
     facebook?: any;
     instagram?: any;
@@ -516,7 +517,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             {greeting}, {userName} <Text style={styles.versionText}> v{Constants.expoConfig?.version || '1.0.0'}</Text>
           </Text>
           
-          {/* Right icons */}
+          {/* Right: help + Rewards/Save toggle + notifications (same pattern as business app Online/In-store) */}
           <View style={styles.headerIcons}>
             <TouchableOpacity
               style={[styles.iconButton, {marginRight: 12}]}
@@ -526,7 +527,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.iconButton}
+              style={[styles.modeButton, mode === 'save' && styles.modeButtonActive]}
+              onPress={() => setMode(mode === 'save' ? 'rewards' : 'save')}
+              activeOpacity={0.7}>
+              <Text style={[styles.modeButtonText, mode === 'save' && styles.modeButtonTextActive]}>
+                {mode === 'rewards' ? 'Save' : 'Rewards'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconButton, {marginLeft: 12}]}
               onPress={() => setNotificationsModalVisible(true)}>
               <View style={styles.bellIconContainer}>
                 {/* Bell handle/loop at top */}
@@ -553,9 +562,54 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         
-        {/* Marketing Banner Section */}
+        {/* Marketing Banner Section - Rewards (green) or Save (grey) per toggle */}
         <View style={styles.bannerSection}>
-          {bannerImage && !bannerError ? (
+          {mode === 'save' ? (
+            <View style={styles.bannerSave}>
+              <View style={styles.bannerContent}>
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitleSave}>Canny Carrot</Text>
+                  <Text style={styles.bannerSubtitleSave}>Save</Text>
+                  <View style={styles.socialIconsContainer}>
+                    {socialIcons.facebook && (
+                      <TouchableOpacity style={[styles.socialIcon, {marginRight: 7}]} onPress={() => Linking.openURL('https://www.facebook.com/CannyCarrotRewards')}>
+                        <Image source={socialIcons.facebook} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.instagram && (
+                      <TouchableOpacity style={[styles.socialIcon, {marginRight: 7}]} onPress={() => Linking.openURL('https://www.instagram.com/cannycarrotrewards')}>
+                        <Image source={socialIcons.instagram} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.tiktok && (
+                      <TouchableOpacity style={[styles.socialIcon, {marginRight: 7}]} onPress={() => Linking.openURL('https://www.tiktok.com/@cannycarrotrewards')}>
+                        <Image source={socialIcons.tiktok} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.x && (
+                      <TouchableOpacity style={[styles.socialIcon, {marginRight: 7}]} onPress={() => Linking.openURL('https://twitter.com/CannyCarrotRew')}>
+                        <Image source={socialIcons.x} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                    {socialIcons.linkedin && (
+                      <TouchableOpacity style={styles.socialIcon} onPress={() => Linking.openURL('https://www.linkedin.com/company/canny-carrot-rewards')}>
+                        <Image source={socialIcons.linkedin} style={styles.socialIconImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.bannerLogoContainer}>
+                  {ccIconImage ? (
+                    <Image source={ccIconImage} style={styles.bannerLogoImage} resizeMode="contain" />
+                  ) : (
+                    <View style={styles.bannerLogoPlaceholder}>
+                      <Text style={styles.bannerLogoText}>Logo</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          ) : bannerImage && !bannerError ? (
             <Image
               source={bannerImage}
               style={styles.bannerImage}
@@ -646,8 +700,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             </View>
           )}
-          {/* Social Media Icons for banner with image */}
-          {bannerImage && !bannerError && (
+          {/* Social Media Icons for banner with image (Rewards mode only) */}
+          {mode === 'rewards' && bannerImage && !bannerError && (
             <View style={styles.bannerSocialIconsOverlay}>
               <View style={styles.socialIconsContainer}>
                 {socialIcons.facebook && (
@@ -1199,6 +1253,26 @@ const styles = StyleSheet.create({
   },
   headerIcons: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modeButton: {
+    width: 56,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: Colors.neutral[200],
+  },
+  modeButtonActive: {
+    backgroundColor: Colors.primary,
+  },
+  modeButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  modeButtonTextActive: {
+    color: Colors.background,
   },
   iconButton: {
     width: 32,
@@ -1350,6 +1424,26 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '600',
     color: Colors.background,
+    marginBottom: 8,
+  },
+  bannerSave: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 20,
+    paddingVertical: 17,
+    minHeight: 128,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  bannerTitleSave: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  bannerSubtitleSave: {
+    fontSize: 21,
+    fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   socialIconsContainer: {

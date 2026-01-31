@@ -93,6 +93,24 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.navItem}
+        onPress={() => onNavigate('Sustain')}>
+        <Text
+          style={[
+            styles.navIcon,
+            currentScreen === 'Sustain' && styles.navIconActive,
+          ]}>
+          🌱
+        </Text>
+        <Text
+          style={[
+            styles.navLabel,
+            currentScreen === 'Sustain' && styles.navLabelActive,
+          ]}>
+          Sustain
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.navItem}
         onPress={() => onNavigate('More')}>
         <Text
           style={[
